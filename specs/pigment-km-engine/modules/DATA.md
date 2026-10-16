@@ -1,6 +1,6 @@
 # Module DATA — datasets, ingestion, build artifact, attribution
 
-**Status:** Not started
+**Status:** In progress — DATA-1 done; next DATA-2 (blocked by G-2 test review)
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/data/pigment_table.dart` (loader), `lib/src/data/artifact_format.dart`, `lib/src/data/resample.dart`, `lib/src/data/masstone_tint.dart`, `lib/src/data/nnls_fit.dart`, `assets/pigments/*` (shipped build artifacts, medium-tagged), `NOTICE`/`ATTRIBUTION.md`, `tool/ingest/*` (offline ingest scripts, not shipped at runtime)
 **Depends on:** CORE, COLOR, KM · **Blocks:** FORWARD-3, SOLVER (real palette), TUNE-3
@@ -9,7 +9,7 @@
 
 | Phase | Kind | Target AC | Status | Tokens | Time |
 |---|---|---|---|---|---|
-| 1 (DATA-1) | shell | — | ⬜ Todo | | |
+| 1 (DATA-1) | shell | — | ✅ Done | 4.16M | 8m39s |
 | 2 (DATA-2) | behavior | AC-8 | ⬜ Todo | | |
 | 3 (DATA-3) | behavior | AC-6 | ⬜ Todo | | |
 | 4 (DATA-4) | behavior | AC-10 | ⬜ Todo | | |
@@ -35,8 +35,25 @@ Build-time ingest (design §4, SI D6) produces a compact medium-tagged artifact 
 - **Tasks:** define the serialized artifact schema (medium, per-paint id/name/pigmentIndex/K/S/opacity/provenance/sourceRef); `PigmentTable.load(Medium)` reading it; ship the synthetic fixture; scaffold the NOTICE with the MPI CC BY 4.0 block (design §13.4) and a Golden/RIT placeholder.
 - **Exit criteria:** analyze clean; 100% touched; `load(acrylic)`/`load(oil)` return the fixture; the suite can observe pigment fields; behavior unchanged.
 
-### Result  <!-- filled on completion -->
-### Checkpoint / Handoff  <!-- filled on completion -->
+### Result
+
+Landed the data stage's shell (behaviour unchanged):
+- `lib/src/data/artifact_format.dart` — `PigmentArtifact` (version, medium, pigments) + `PigmentArtifactCodec.encode/decode`. On-disk form is stable indented JSON `{version, medium, grid{start,end,step,bins}, paints[{id,name,pigmentIndex,opacity,provenance,sourceRef,k[31],s[31]}]}`. `decode` validates version, medium, provenance, the embedded grid (rejects any non-canonical grid — resample is an ingest step, AC-8, never a load one) and every spectrum's length, all as `FormatException`.
+- `lib/src/data/pigment_table.dart` — `PigmentTable.load(Medium)` (the data-stage read endpoint), `.fromArtifact`, `.byId`; `pigments` is unmodifiable.
+- `lib/src/data/synthetic_fixture.dart` — the D-7 placeholder: 3 paints per medium, honestly tagged `Provenance.estimated` with `sourceRef` `synthetic:…` (never measured/calculated).
+- `assets/pigments/synthetic_{acrylic,oil}.json` — the shipped build artifacts, generated from the builder via `encode`; a parity test asserts file == `encode(builder)` so they cannot drift.
+- `ATTRIBUTION.md` — companion to the existing NOTICE (which already carries the MPI CC BY 4.0 block + Golden/RIT permission block from CORE-1); maps each source → provenance tier; real acrylic wording pending G-3/DATA-7, oil pending G-4/DATA-6.
+- Exported the two public data files from `lib/pigment_km.dart` (`SyntheticFixture` stays internal under `src/`).
+
+Verify (green): `dart analyze` clean · `dart test` **54/54** (+26; 28 pre-existing unchanged) · coverage gate **PASS 100% lines touched** (artifact_format 87/87, pigment_table 9/9, synthetic_fixture 32/32; entry has no executable lines). No acceptance suite yet (ITEST-1 creates it). Fix passes: 1/3 (first run: 3 interpolation-brace lints + 1 test — `decode` wrong-length threw `ArgumentError` via `checkLength`; switched `_spectrum` to raise `FormatException` itself per the decode contract). Tokens/Time: see dashboard.
+
+### Checkpoint / Handoff
+
+- **Frozen interfaces (build against these):** `PigmentArtifactCodec.{currentVersion=1, encode, decode}`; `PigmentArtifact{version, medium, pigments}`; `PigmentTable.{load(Medium), fromArtifact(artifact), medium, pigments (unmodifiable), byId(id)}`. The JSON schema above is the shipped artifact contract. `Provenance.estimated` is the only tier the synthetic data uses.
+- **Shell gap (deliberate):** `load` builds the synthetic table **in memory**; the shipped `assets/pigments/synthetic_*.json` are generated from the same builder and drift-guarded by test. DATA-3 (AC-6 full load path) switches `load` to *decode the shipped asset*, making the file the single source; DATA-5/DATA-6 ingest regenerate the real acrylic/oil artifacts.
+- **Verification (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"` first. `dart analyze` · `dart test` · `bash tool/coverage_gate.sh <BASE>` (line-only, documented). To regenerate an asset after a fixture change: a tiny `dart run` script that calls `PigmentArtifactCodec.encode(SyntheticFixture.artifact(m))` and writes `assets/pigments/synthetic_<m>.json` + a trailing newline (the parity test pins the exact bytes).
+- **Known gaps:** none new. Line-coverage-only gate (CORE-1 deviation) still applies.
+- **Next:** CORE + DATA shells done → **ITEST-1** (acceptance harness over the wired shells; needs both). Then ITEST-2∥3∥4 (one pending test per AC + red baseline) → ITEST-5 test review (**G-2**) before any behaviour. DATA behaviour (DATA-2 resample … DATA-7 attribution) unblocks after G-2; DATA-5/6/7 also need the dataset gates G-3/G-4/G-5.
 
 ## Phase 2 — DATA-2: resample onto the canonical grid (AC-8)
 

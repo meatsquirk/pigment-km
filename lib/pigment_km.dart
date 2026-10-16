@@ -7,6 +7,8 @@
 /// this library pins the contract they build against.
 library;
 
+export 'src/data/artifact_format.dart';
+export 'src/data/pigment_table.dart';
 export 'src/engine/custom_km_engine.dart';
 export 'src/engine/mixing_engine.dart';
 export 'src/engine/spectral_baseline_engine.dart';
