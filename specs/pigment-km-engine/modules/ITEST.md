@@ -1,6 +1,6 @@
 # Module ITEST — acceptance integration suite
 
-**Status:** Not started
+**Status:** 🔄 In progress (ITEST-1 ✅)
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `test/acceptance/*` (harness, fixtures, pending gate, one test per AC), `test/acceptance/fixtures/*`
 **Depends on:** CORE-2, DATA-1 (shells) · **Blocks:** every behavior phase (via G-2)
@@ -9,7 +9,7 @@
 
 | Phase | Kind | Target AC | Status | Tokens | Time |
 |---|---|---|---|---|---|
-| 1 (ITEST-1) | acceptance-tests | — (harness) | ⬜ Todo | | |
+| 1 (ITEST-1) | acceptance-tests | — (harness) | ✅ Done | 5.53M | 12m 21s |
 | 2 (ITEST-2) | acceptance-tests | AC-1..9 | ⬜ Todo | | |
 | 3 (ITEST-3) | acceptance-tests | AC-10..18 | ⬜ Todo | | |
 | 4 (ITEST-4) | acceptance-tests | AC-19..27 | ⬜ Todo | | |
@@ -27,7 +27,28 @@
 - **Tasks:** Given/When/Then vocabulary; the 6 fixtures (synthPigments, refSpectrumColour, oogColour, acrylicPublished-placeholder, oilMixtures-placeholder, illuminants); `pendingACs` with **all 27 ACs** pending; default + run-pending targets; a never-pending smoke test proving the engine constructs and `forward` of the synthetic white returns a near-white through the public surface.
 - **Exit criteria:** `dart test test/acceptance` green (everything pending-skipped except smoke); the pending map lists all 27 AC→phase keys and the test asserts its size == 27 and each key names a real phase (no vacuous pass); deterministic (no sleeps).
 
-### Result · Checkpoint  <!-- filled on completion -->
+### Result · Checkpoint
+
+**Result.** Acceptance harness stood up over the wired CORE-2/DATA-1 shells; no behaviour, no `lib/` touched (all new files under `test/acceptance/`).
+
+- **Landed:**
+  - `test/acceptance/harness/pending.dart` — the pending gate: `pendingACs` map (all **27** ACs → owning behaviour phase, per the build order), a closed `behaviourPhases` set (27 members), `runPending` (reads `PIGMENT_KM_RUN_PENDING`), and `ac(acId)` which `markTestSkipped`s a pending AC unless run-pending is on. A behaviour phase un-pends by deleting its map row.
+  - `test/acceptance/harness/fixtures.dart` — the 6 fixtures, all through the public surface: `synthPigments()`/`synthWhite()` (via `PigmentTable.load`), `perfectDiffuser` (R=1×31), `refSpectrumColour` (perfect diffuser → D65 white point XYZ (0.95047,1,1.08883)/sRGB white), `oogColour` (pure-green sRGB(0,1,0), XYZ + OKLCh C≈0.295 — unreachable by the muted synthetic palette), and three **explicit placeholders** flagged `isReal:false`/`isPlaceholder:true`: `acrylicPublishedPlaceholder` (G-3/DATA-5), `oilMixturesPlaceholder` (G-4/DATA-6), `illuminants` (Planckian 6500 K/2856 K stand-ins; real SPDs at G-7).
+  - `test/acceptance/harness/harness.dart` — one-import barrel (re-exports fixtures + pending) + Given/When/Then vocabulary (`customEngine`/`baselineEngine`/`givenAcrylicTable`/`givenOilTable`), public surface only.
+  - `test/acceptance/pending_gate_test.dart` — the anti-vacuous guard (never pending): pins `pendingACs` size==27, exact keys AC-1..AC-27, and the bijection `values.toSet()==behaviourPhases`.
+  - `test/acceptance/smoke_test.dart` — never-pending shell-stage wiring proof: both engines construct via the barrel; both tables load medium-tagged on the 31-grid; `forward`/`reflectanceOf` reachable and throw the **documented** `UnimplementedError`; the fixtures construct (incl. warm<neutral@400 nm / warm>neutral@700 nm SPD ordering).
+- **Drift from the task (reported, resolved honestly):** the task named a smoke "forward of synthetic white returns near-white"; `forward` is an `UnimplementedError` stub until FORWARD, so the smoke asserts the genuine wiring proof available now (construct + load + documented-error reachable) and the near-white assertion is scheduled for **FORWARD-3** (see Checkpoint). Documented in the smoke's top NOTE + inline.
+- **Verification (green):** `dart analyze` → No issues · `dart test` → **61/61** · acceptance default `dart test test/acceptance` → **7/7** · acceptance run-pending → **7/7** (no per-AC tests yet, so default == run-pending). Coverage gate **N/A** — no `lib/` source touched (harness is all test code); the gate script also errors on an empty changed-set under `set -u` (scaffold-tool gap, noted below).
+- **Grades:** fresh independent subagent grader (G1–G6 + harness rubric: no vacuous passes / honest comments / deterministic) → **5 A / 0 B** across all 5 files; one optional hardening applied (`expect(pendingACs, hasLength(27))` atop the owners test so it is self-sufficient).
+- **Fix passes:** 0/3 (passed first run; 9 post-run `info` lints — `omit_local_variable_types`, `directives_ordering` — cleaned to keep `dart analyze` at zero, counted as authoring).
+- **Tokens / Time:** 5.53M / 12m 21s.
+
+**Checkpoint / Handoff.**
+- **Frozen harness contract (ITEST-2/3/4 build on these):** import `harness/harness.dart`; call `ac('AC-n')` at the top of each AC test to honour the pending gate; un-pend = delete that AC's row in `pending.dart`. Fixtures named above are the shared inputs; extend the GWT vocabulary in `harness.dart` as scenarios need (public surface only — never reach into `lib/src`). Test files are `test/acceptance/<group>_test.dart`; helper files under `harness/` are not `_test.dart` so `dart test test/acceptance` does not run them as suites.
+- **Pending gate:** `PIGMENT_KM_RUN_PENDING=true dart test test/acceptance` is the red-baseline mode. `@stretch` (AC-26/27) still to be tagged by ITEST-4 so `dart test -x stretch` excludes them until G-7.
+- **Verification (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"` first. `dart analyze` · `dart test` · acceptance default/red-baseline as above.
+- **Known gaps / notes:** (a) smoke `forward` case is a documented-error wiring proof → **FORWARD-3** strengthens it to synthetic-white→near-white; (b) `tool/coverage_gate.sh` crashes (`changed[@]: unbound variable`) when zero `lib/` files are touched — harmless here (nothing to cover), a future scaffold fix for phases that touch no source; (c) line-coverage-only gate (CORE-1 deviation) still applies.
+- **Next:** **ITEST-2 ∥ ITEST-3 ∥ ITEST-4** — one pending test per AC + red baseline, disjoint files (AC-1..9 / AC-10..18 / AC-19..27), parallelizable. Then **ITEST-5** test review → **G-2** gates the whole behaviour stage.
 
 ## Phase 2 — ITEST-2: AC-1..9 (pending) + red baseline
 
