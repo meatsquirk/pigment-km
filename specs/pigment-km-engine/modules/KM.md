@@ -1,6 +1,6 @@
 # Module KM — Kubelka–Munk physics
 
-**Status:** In progress — KM-3 ✅ done (AC-4); next KM-4 (enabler, two-constant mixing)
+**Status:** ✅ Done — KM-2/3/4 complete (reflectance + f(R), Saunderson, two-constant mixing). AC-5's un-pend lands downstream in FORWARD-2 (G-2 routing).
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/km/reflectance.dart` (KM reflectance + inverse f(R)), `lib/src/km/saunderson.dart`, `lib/src/km/mixing.dart` (two-constant Σv·K, Σv·S + concentration)
 **Depends on:** CORE · **Blocks:** FORWARD, DATA (ingest round-trip)
@@ -11,7 +11,7 @@
 |---|---|---|---|---|---|
 | 2 (KM-2) | behavior | AC-3 | ✅ Done | 5.87M | 9m 58s (24m) |
 | 3 (KM-3) | behavior | AC-4 | ✅ Done | 7.45M | 15m 00s (15m 07s) |
-| 4 (KM-4) | enabler | — (mixing for AC-5) | ⬜ Todo | | |
+| 4 (KM-4) | enabler | — (mixing for AC-5) | ✅ Done | 3.94M | 7m 52s (8m 09s) |
 
 ## Interface reconciliation
 
@@ -154,5 +154,56 @@ so the tests assert structure, not the literals beyond the documented pin.
 - **Tasks:** `Kmix=Σv·K`, `Smix=Σv·S` elementwise; concentration = volume fraction (§5); self-mix idempotence; order-independence.
 - **Exit criteria:** analyze clean; 100% touched; self-mix==pure colour; permutation invariance (unit-level — AC-5's acceptance gate is in FORWARD-2).
 
-### Result  <!-- filled on completion -->
-### Checkpoint / Handoff  <!-- filled on completion -->
+### Result
+
+Implemented the two-constant mixing primitive `mixTwoConstant(List<MixComponent>)
+→ KmMix` in `lib/src/km/mixing.dart` (design §3.3, §5): elementwise volume-weighted
+sums `Kmix = Σ vᵢ·Kᵢ`, `Smix = Σ vᵢ·Sᵢ`. `MixComponent = ({k, s, weight})` and
+`KmMix = ({k, s})` records. Sums accumulate in `Float64List` and narrow to the
+`Spectrum`'s `Float32` once, so the result is order-independent at the spectrum's
+precision. It sums weights **as given** — no normalisation (that is FORWARD-2's
+AC-14, deliberately not hidden here). Guards: non-empty components + each spectrum
+`CanonicalGrid.checkLength`. Exported from the barrel.
+
+- **Kind: enabler — no AC un-pended here.** AC-5's acceptance gate is FORWARD-2
+  (G-2). So `pending.dart`/`pending_gate_test.dart`/`backends_stub_test.dart` are
+  untouched: the 27↔27 bijection keeps AC-5's owner = KM-4 (the mixing phase), and
+  FORWARD-2 will move `AC-5 → KM-4` into `unpendedACs` when it un-pends — retargeting
+  the owner to FORWARD-2 would collide with AC-14 and break the bijection test.
+- **Gates (all green, first full run — fix passes 0/3):** `dart analyze` clean;
+  `dart test` 108 pass / 24 skip / 0 fail; coverage PASS (`mixing.dart` 16/16 lines,
+  line-only metric; barrel no executable lines); acceptance default green
+  (10 pass / 24 pending — AC-5 still pending, as intended).
+- **No grade gate** (enabler, no un-pended AC test).
+- **Unit tests:** new `test/mixing_test.dart` — independent double-precision `refMix`
+  reference; shape; per-wavelength weighted-sum match; single-paint identity; K and S
+  mixed independently (rejects a ratio-only mix); **self-mix idempotence** at four
+  ratios + three-way split == whole (AC-5); **order independence** under permutation
+  (AC-5); weights used as given, not normalised (summing to 2 doubles the result;
+  zero-weight contributes nothing — pins the no-normalisation contract so AC-14 stays
+  meaningful); empty-list and off-grid guards throw.
+- **No augmentations** assigned to or newly enabled by this phase.
+- Tokens: 3.94M · Time: 7m 52s (8m 09s) — see ledger.
+
+### Checkpoint / Handoff
+
+- **Frozen interface:** `mixTwoConstant(List<MixComponent> components) → KmMix`
+  with `MixComponent = ({Spectrum k, Spectrum s, double weight})` and
+  `KmMix = ({Spectrum k, Spectrum s})`. Elementwise `Kmix = Σ vᵢ·Kᵢ`,
+  `Smix = Σ vᵢ·Sᵢ`; output spectra are `CanonicalGrid.bins` long. Pure weighted
+  sum — **does not normalise** weights, and does not form `K/S` (that is KM-2's
+  `kmReflectance` input). Throws `ArgumentError` on empty components or an off-grid
+  spectrum. Exported via the barrel.
+- **Verification commands (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"`
+  first. Analyze `dart analyze`; unit `dart test`; coverage
+  `bash tool/coverage_gate.sh <BASE>` (line-only); acceptance default
+  `dart test test/acceptance`; run-pending `PIGMENT_KM_RUN_PENDING=true dart test
+  test/acceptance`.
+- **Next — FORWARD-2 (`CustomKmEngine`, AC-14 un-pend + AC-5 un-pend):** the forward
+  path normalises `Map<String,double>` volumes to Σ1 (AC-14), looks up each paint's
+  K/S, builds `MixComponent`s, calls `mixTwoConstant`, then `K/S = Kmix/Smix` →
+  `kmReflectance` (KM-2) → `saundersonToMeasured` (KM-3) → spectrum→colour (COLOR).
+  FORWARD-2 un-pends **AC-5** (self-mix/order-independence at the colour level via
+  `forward`) recording `AC-5 → KM-4` in `unpendedACs`, and **AC-14** recording
+  `AC-14 → FORWARD-2`. Drop the matching rows in `backends_stub_test.dart`.
+- **Known gaps:** none. KM module complete (KM-2/3/4 ✅).

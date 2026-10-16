@@ -19,6 +19,7 @@ export 'src/engine/custom_km_engine.dart';
 export 'src/engine/mixing_engine.dart';
 export 'src/engine/spectral_baseline_engine.dart';
 export 'src/grid.dart';
+export 'src/km/mixing.dart';
 export 'src/km/reflectance.dart';
 export 'src/km/saunderson.dart';
 export 'src/types/colour_value.dart';
