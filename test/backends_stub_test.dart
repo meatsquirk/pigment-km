@@ -23,9 +23,8 @@ void main() {
   );
 
   group('COLOR backend stubs throw their documented UnimplementedError', () {
-    test('spectrumToColour — COLOR-2', () {
-      expect(() => spectrumToColour(spectrum), throwsUnimplementedError);
-    });
+    // spectrumToColour is implemented in COLOR-2 (see test/colour_test.dart);
+    // only the gamutMap stub remains until COLOR-3.
     test('gamutMap — COLOR-3', () {
       expect(() => gamutMap(target), throwsUnimplementedError);
     });

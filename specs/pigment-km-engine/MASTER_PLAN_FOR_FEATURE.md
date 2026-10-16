@@ -1,7 +1,7 @@
 # Master Plan — pigment_km: measured-pigment Kubelka–Munk mixing engine
 
 **Spec:** [pigment-km-engine.feature](../pigment-km-engine.feature)
-**Status:** In progress — behaviour stage open (G-2 approved 2026-10-16); COLOR-2 ∥ KM-2 ∥ DATA-2 startable
+**Status:** In progress — behaviour stage: COLOR-2 (AC-1) ✅; next KM-2 ∥ DATA-2 ∥ COLOR-3 startable
 **Architecture:** [Nuance/docs/custom-mixing-engine-design.md](../../../Nuance/docs/custom-mixing-engine-design.md) (physics §3, datasets §4, forward/inverse §6, tuning §7, staged plan §8, licensing §13) · [Nuance/docs/paint-color-app-solution-intent.md](../../../Nuance/docs/paint-color-app-solution-intent.md) (D3/D6/D7/D9, accuracy NFRs) · consumption contract: `Nuance/lib/recipes/engine/mixing_engine.dart` (bs-04)
 **Code home:** `/Users/matthew.quirk/pigment_km` · remote `https://github.com/meatsquirk/pigment-km` (origin, pushed) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
 
@@ -55,7 +55,7 @@ Greenfield — nothing exists yet; every AC is net-new. The gap is the whole lib
 
 | AC | Scenario | Integration test (ITEST) | Behavior phases | Status |
 |---|---|---|---|---|
-| AC-1 | A reflectance spectrum converts to its expected colour | ITEST-2 `TestAC01_SpectrumToColour` | COLOR-2 | ⬜ Todo |
+| AC-1 | A reflectance spectrum converts to its expected colour | ITEST-2 `TestAC01_SpectrumToColour` | COLOR-2 | ✅ |
 | AC-2 | Colours outside sRGB are gamut-mapped, not clipped | ITEST-2 `TestAC02_GamutMap` | COLOR-3 | ⬜ Todo |
 | AC-3 | Kubelka–Munk reflectance and K/S round-trip | ITEST-2 `TestAC03_KmRoundTrip` | KM-2 | ⬜ Todo |
 | AC-4 | Saunderson correction round-trips per medium | ITEST-2 `TestAC04_Saunderson` | KM-3 | ⬜ Todo |
@@ -159,7 +159,7 @@ Pre-seeded augmentations: AC-7/AC-11/AC-21 strengthened by DATA-5/DATA-7/TUNE-3 
 | Module | Plan | Purpose | Depends on | Status |
 |---|---|---|---|---|
 | CORE | [modules/CORE.md](modules/CORE.md) | Package scaffold; canonical grid; core value types; `MixingEngine` interface + stub engines | — | ✅ Done |
-| COLOR | [modules/COLOR.md](modules/COLOR.md) | Spectrum→XYZ→sRGB backend + OKLCh gamut map | CORE | ⬜ Todo |
+| COLOR | [modules/COLOR.md](modules/COLOR.md) | Spectrum→XYZ→sRGB backend + OKLCh gamut map | CORE | 🔄 In progress (COLOR-2 ✅) |
 | KM | [modules/KM.md](modules/KM.md) | KM reflectance, Saunderson, two-constant mixing, concentration | CORE | ⬜ Todo |
 | DATA | [modules/DATA.md](modules/DATA.md) | Pigment data model, ingest, resample, NNLS/masstone-tint, build artifact, attribution | CORE, COLOR, KM | 🔄 In progress (DATA-1 ✅) |
 | FORWARD | [modules/FORWARD.md](modules/FORWARD.md) | `forward()` engine over measured pigments | COLOR, KM, DATA | ⬜ Todo |
@@ -223,8 +223,8 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 | 6 | ITEST-3 | acceptance-tests: AC-10..18 (pending) + red baseline | ✅ Done | 10.79M | 22m 28s | 9 A (AC-11/12 data-limited); red baseline −9 each naming its owner; Option-A DATA-4 stub added |
 | 7 | ITEST-4 | acceptance-tests: AC-19..27 (pending) + red baseline | ✅ Done | 6.34M | 16m 10s | 6 A / 1 A-data-limited (AC-21) / 2 B-pending (AC-26/27, G-7); red baseline −9 each for the right reason; no Option-A stubs; `@stretch` tagged |
 | 8 | ITEST-5 | test-review: packet; G-2 | ✅ Done | 2.27M | 5m 13s | packet assembled (27 ACs, 24 A / 3 B-pending); G-2 approved 2026-10-16 (AC-23 post-prediction transform; AC-5 un-pend → FORWARD-2) |
-| 9 | COLOR-2 | AC-1 spectrum→colour | ⬜ Todo | | | ∥ KM-2, DATA-2 |
-| 10 | COLOR-3 | AC-2 gamut map | ⬜ Todo | | | |
+| 9 | COLOR-2 | AC-1 spectrum→colour | ✅ Done | 7.64M | 17m 38s | CMF·D65 weights + spectrumToColour; AC-1 un-pended, green; cov 39/39; grade A |
+| 10 | COLOR-3 | AC-2 gamut map | ⬜ Todo | | | startable (COLOR-2 ✅) ∥ KM-2, DATA-2 |
 | 11 | KM-2 | AC-3 KM round-trip | ⬜ Todo | | | ∥ COLOR-2, DATA-2 |
 | 12 | KM-3 | AC-4 Saunderson | ⬜ Todo | | | |
 | 13 | KM-4 | two-constant mixing (enabler; AC-5 un-pends in FORWARD-2) | ⬜ Todo | | | |
@@ -256,11 +256,11 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 
 ## Next phase
 
-**G-2 approved 2026-10-16** — the acceptance stage is closed and the behaviour stage is open. Routing decisions recorded: **AC-23** wet/dry is a **post-prediction state transform** (`forward`/`inverse` stay option-free; TUNE-4 re-renders colour without re-solving); **AC-5**'s un-pend moves **KM-4 → FORWARD-2** (KM-4 stays the mixing enabler).
+**COLOR-2 (AC-1 spectrum→colour) ✅ done** — `cmf_d65_weights.dart` (precomputed CMF·D65) + `spectrumToColour`; AC-1 un-pended and green.
 
-**Startable now (parallel, disjoint files):** **COLOR-2** (AC-1 spectrum→colour) ∥ **KM-2** (AC-3 KM round-trip) ∥ **DATA-2** (AC-8 resample). Each in its own session (`--parallel` for concurrency).
+**Startable now (parallel, disjoint files):** **KM-2** (AC-3 KM round-trip, `km/*`) ∥ **DATA-2** (AC-8 resample, `data/resample.dart`) ∥ **COLOR-3** (AC-2 gamut map, `colour/oklch.dart`+`gamut_map.dart` — now unblocked by COLOR-2). Each in its own session (`--parallel` for concurrency). KM-2 is next on the acrylic critical path (COLOR→KM→DATA→FORWARD).
 
-Recommended order: acrylic critical path (COLOR→KM→DATA→FORWARD) to the ΔE00 gate, then SOLVER, TUNE, PROD; STRETCH only if G-7 approves scope. Dataset gates G-3/G-4/G-5 block only the fidelity/real-palette ACs (AC-7/9/11/12/21); everything else runs on the synthetic fixture (D-7). G-6 adds held-out validation for AC-17; G-7 gates STRETCH.
+Dataset gates G-3/G-4/G-5 block only the fidelity/real-palette ACs (AC-7/9/11/12/21); everything else runs on the synthetic fixture (D-7). G-6 adds held-out validation for AC-17; G-7 gates STRETCH. Routing (G-2): AC-23 = post-prediction state transform (TUNE-4); AC-5 un-pend → FORWARD-2.
 
 ## Token usage
 
@@ -279,7 +279,8 @@ Recommended order: acrylic critical path (COLOR→KM→DATA→FORWARD) to the Δ
 | ITEST-4 | 0f8bbd98 | 2026-10-16 09:10 EDT | 09:27 | 16m 10s | 16m 10s | claude-opus-4-8 | 108 | 202,680 | 6,082,471 | 57,386 | 6,342,645 | AC-19..27 pending + red baseline (−9 each right reason); grades 6 A / 1 A-data-limited / 2 B-pending (G-7); no Option-A stubs; @stretch tagged |
 | ITEST-5 | 1e7e17af | 2026-10-16 10:09 EDT | 10:15 | 5m 13s | 5m 13s | claude-opus-4-8 | 46 | 107,864 | 2,143,635 | 19,764 | 2,271,309 | packet assembled; ⏸ awaiting G-2 decision; 24 A / 3 B-pending; suite re-verified green + red baseline |
 | SIGNOFF-DECISION | 4716a8e4 | 2026-10-16 10:46 EDT | 11:12 | 25m 52s | 5m 30s | claude-opus-4-8 | 66 | 77,272 | 2,826,847 | 24,635 | 2,928,820 | ITEST-5 approved |
-| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-16 11:12** | **3h 02m** | **2h 12m** |  | **920** | **1,555,272** | **52,215,342** | **516,545** | **54,288,079** |  |
+| COLOR-2 | b02bec01 | 2026-10-16 11:40 EDT | 11:58 | 17m 38s | 17m 38s | claude-opus-4-8 | 130 | 195,076 | 7,381,010 | 61,136 | 7,637,352 | AC-1 spectrum→colour: CMF·D65 weights + spectrumToColour; AC-1 un-pended green; analyze clean, unit 78/26/0, coverage PASS (39/39), acceptance 8/26, grade A |
+| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-16 11:58** | **3h 19m** | **2h 30m** |  | **1,050** | **1,750,348** | **59,596,352** | **577,681** | **61,925,431** |  |
 
 ## Sign-off
 
