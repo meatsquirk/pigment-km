@@ -1,6 +1,6 @@
 # Module KM — Kubelka–Munk physics
 
-**Status:** In progress — KM-2 ✅ done; next KM-3 (AC-4 Saunderson)
+**Status:** In progress — KM-3 ✅ done (AC-4); next KM-4 (enabler, two-constant mixing)
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/km/reflectance.dart` (KM reflectance + inverse f(R)), `lib/src/km/saunderson.dart`, `lib/src/km/mixing.dart` (two-constant Σv·K, Σv·S + concentration)
 **Depends on:** CORE · **Blocks:** FORWARD, DATA (ingest round-trip)
@@ -10,7 +10,7 @@
 | Phase | Kind | Target AC | Status | Tokens | Time |
 |---|---|---|---|---|---|
 | 2 (KM-2) | behavior | AC-3 | ✅ Done | 5.87M | 9m 58s (24m) |
-| 3 (KM-3) | behavior | AC-4 | ⬜ Todo | | |
+| 3 (KM-3) | behavior | AC-4 | ✅ Done | 7.45M | 15m 00s (15m 07s) |
 | 4 (KM-4) | enabler | — (mixing for AC-5) | ⬜ Todo | | |
 
 ## Interface reconciliation
@@ -86,8 +86,65 @@ and `kmFunction` (`K/S = (1−R)²/(2R)`), both elementwise over the input spect
 - **Exit criteria:** analyze clean; 100% touched; round-trip within 1e-6; two media → two results.
 - **Acceptance gate:** un-pend AC-4; `TestAC04_Saunderson` green.
 
-### Result  <!-- filled on completion -->
-### Checkpoint / Handoff  <!-- filled on completion -->
+### Result
+
+Implemented the Saunderson surface correction in `lib/src/km/saunderson.dart`:
+`configForMedium(Medium)` (a `switch` returning the per-medium `MediumConfig`),
+`saundersonToMeasured` (`R_m = k1 + (1−k1)(1−k2)·R_i/(1−k2·R_i)`, elementwise) and
+its exact algebraic inverse `saundersonToInternal`. Per-medium constants use the
+documented defaults — acrylic k1=0.04/k2=0.6, oil k1=0.05/k2=0.6 (oil's higher
+refractive index → larger surface k1); authoritative values remain gated on G-5,
+so the tests assert structure, not the literals beyond the documented pin.
+
+- **Gates (all green):** `dart analyze` clean; `dart test` 97 pass / 24 skip / 0
+  fail; coverage PASS (`saunderson.dart` 19/19 lines — line-only metric);
+  acceptance default green (AC-4 un-pended & green; 24 ACs still pending);
+  `TestAC04_Saunderson` green.
+- **Grade gate:** fresh independent adversarial subagent re-graded every un-pended
+  AC test. First pass: **AC-4 = B** — `TestAC04_Saunderson`'s round-trip is
+  mutually-inverse by construction and its two controls differ only in k1, so a
+  k2-dropping forward passed (the k2 term unverified; no other suite check covers
+  Saunderson). **Fixed in-phase (fix pass 1/3):** added an independent full-formula
+  forward reference asserted per bin for both media + a hand-computed anchor
+  (R_i=0.2→R_m=0.12727273) + a documented-constant pin. A second fresh grader
+  re-graded **AC-4 = A**. Final: **3 A** (AC-1, AC-3 re-confirmed; AC-4 B→A).
+- **Un-pend:** deleted AC-4 from `pendingACs` (`pending.dart`), added `AC-4: KM-3`
+  to `unpendedACs` (`pending_gate_test.dart`), removed the three Saunderson stub
+  rows (+ now-unused `config`) from `backends_stub_test.dart`.
+- **Unit tests:** new `test/saunderson_test.dart` — per-medium config defaults,
+  hand-computed forward anchors (acrylic & oil at R_i=0.5), not-a-no-op control,
+  per-medium distinctness control, round-trip to 1e-6 over both media.
+- **Augmentations:** none assigned; the AC-4 hardening strengthens AC-4's own test
+  only (its B→A fix), not a neighbour.
+- Tokens: 7.45M · Time: 15m 00s active (15m 07s wall) — see ledger.
+
+### Checkpoint / Handoff
+
+- **Frozen interface:** `configForMedium(Medium) → MediumConfig`,
+  `saundersonToMeasured(Spectrum, MediumConfig) → Spectrum` and
+  `saundersonToInternal(Spectrum, MediumConfig) → Spectrum` are exact inverses
+  within fp tolerance over the physical reflectance range; elementwise, output
+  length == input length. All exported via the barrel. The forward model is the
+  **full** Saunderson (k2 internal-reflection term included) — the AC-4 test pins
+  it independently, so a later refactor that drops k2 will fail.
+- **Verification commands (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"`
+  first. Analyze `dart analyze`; unit `dart test`; coverage
+  `bash tool/coverage_gate.sh <BASE>` (line-only); acceptance default
+  `dart test test/acceptance`; run-pending `PIGMENT_KM_RUN_PENDING=true dart test
+  test/acceptance`. Un-pend = delete the AC row in `pending.dart` **and** add it
+  to `unpendedACs` in `pending_gate_test.dart` **and** drop the stub's
+  `throwsUnimplementedError` row(s) in `backends_stub_test.dart`.
+- **Next phase KM-4 (enabler, `mixing.dart`):** two-constant mixing `Kmix=Σv·K`,
+  `Smix=Σv·S` elementwise; concentration = volume fraction (§5); self-mix
+  idempotence + order-independence at unit level. AC-5's acceptance gate is in
+  FORWARD-2 (G-2 routing). KM-4 composes with `kmReflectance`/`saundersonToMeasured`
+  for the forward pipeline (FORWARD renders mixing → reflectance → Saunderson →
+  spectrum→colour).
+- **G-5 coupling (carry-forward):** the AC-4 acceptance test and the
+  `saunderson_test.dart` anchors hard-pin the documented defaults (acrylic
+  0.04/0.6, oil 0.05/0.6). When G-5 confirms the authoritative per-medium k1,k2,
+  update `configForMedium` **and** both tests' pins/anchors in lockstep.
+- **Known gaps:** none for AC-4 (behaviour complete; constants provisional pending G-5).
 
 ## Phase 4 — KM-4: two-constant mixing + concentration (enabler — AC-5 un-pends in FORWARD-2)
 

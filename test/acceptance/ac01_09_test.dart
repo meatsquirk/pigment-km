@@ -146,6 +146,10 @@ void main() {
       final oil = configForMedium(Medium.oil);
       expect(acrylic.k1 != oil.k1 || acrylic.k2 != oil.k2, isTrue,
           reason: 'acrylic and oil must carry distinct Saunderson constants');
+      // The documented defaults (G-5 confirms the authoritative values); pinned
+      // here so the hand-computed forward anchor below is a fixed reference.
+      expect(acrylic.k1, closeTo(0.04, 1e-12));
+      expect(acrylic.k2, closeTo(0.6, 1e-12));
 
       // WHEN it is converted to measured reflectance and back (acrylic).
       final measured = saundersonToMeasured(internal, acrylic);
@@ -156,10 +160,32 @@ void main() {
         expect(roundTripped[i], closeTo(internal[i], 1e-5),
             reason: 'internal reflectance must round-trip at bin $i');
       }
+      // AND the forward correction is the FULL Saunderson model, not merely an
+      // invertible stand-in: measured matches an independent re-derivation of
+      // `R_m = k1 + (1−k1)(1−k2)·R_i/(1−k2·R_i)` at every bin, for BOTH media.
+      // This pins the k2 internal-reflection term — the round-trip alone cannot
+      // (any mutually-inverse pair round-trips), and the per-medium control
+      // below cannot (acrylic and oil differ in k1). Rejects a k2-dropping
+      // forward such as `R_m = k1 + (1−k1)·R_i` (invertible and per-medium
+      // distinct, yet wrong).
+      final measuredOil = saundersonToMeasured(internal, oil);
+      double refMeasured(double ri, MediumConfig c) =>
+          c.k1 + (1 - c.k1) * (1 - c.k2) * ri / (1 - c.k2 * ri);
+      for (var i = 0; i < CanonicalGrid.bins; i++) {
+        expect(measured[i], closeTo(refMeasured(internal[i], acrylic), 1e-6),
+            reason: 'acrylic forward must be the full Saunderson model at bin $i');
+        expect(measuredOil[i], closeTo(refMeasured(internal[i], oil), 1e-6),
+            reason: 'oil forward must be the full Saunderson model at bin $i');
+      }
+      // AND a hand-computed fixed anchor (independent of the re-derivation
+      // above, so a shared algebra slip can't hide): at bin 0, R_i=0.2 with the
+      // documented acrylic (k1=0.04, k2=0.6), R_m = 0.04 + 0.384·0.2/0.88 =
+      // 0.12727273.
+      expect(internal[0], closeTo(0.2, 1e-6)); // Float32 storage of 0.2
+      expect(measured[0], closeTo(0.12727273, 1e-6));
       // AND acrylic and oil use their own distinct k1,k2: the SAME internal
       // input corrects to DIFFERENT measured reflectance per medium (control —
       // rejects a no-op Saunderson, or one global k1,k2 for all media).
-      final measuredOil = saundersonToMeasured(internal, oil);
       expect(spectraEqual(measured, measuredOil), isFalse,
           reason: 'per-medium constants must make the measured reflectance differ');
       expect(spectraEqual(measured, internal), isFalse,

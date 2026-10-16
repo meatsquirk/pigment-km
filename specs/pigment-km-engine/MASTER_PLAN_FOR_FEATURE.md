@@ -1,7 +1,7 @@
 # Master Plan — pigment_km: measured-pigment Kubelka–Munk mixing engine
 
 **Spec:** [pigment-km-engine.feature](../pigment-km-engine.feature)
-**Status:** In progress — behaviour stage: KM-2 (AC-3) ✅; next KM-3 ∥ DATA-2 ∥ COLOR-3 startable
+**Status:** In progress — behaviour stage: KM-3 (AC-4) ✅; next KM-4 ∥ DATA-2 ∥ COLOR-3 startable
 **Architecture:** [Nuance/docs/custom-mixing-engine-design.md](../../../Nuance/docs/custom-mixing-engine-design.md) (physics §3, datasets §4, forward/inverse §6, tuning §7, staged plan §8, licensing §13) · [Nuance/docs/paint-color-app-solution-intent.md](../../../Nuance/docs/paint-color-app-solution-intent.md) (D3/D6/D7/D9, accuracy NFRs) · consumption contract: `Nuance/lib/recipes/engine/mixing_engine.dart` (bs-04)
 **Code home:** `/Users/matthew.quirk/pigment_km` · remote `https://github.com/meatsquirk/pigment-km` (origin, pushed) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
 
@@ -58,7 +58,7 @@ Greenfield — nothing exists yet; every AC is net-new. The gap is the whole lib
 | AC-1 | A reflectance spectrum converts to its expected colour | ITEST-2 `TestAC01_SpectrumToColour` | COLOR-2 | ✅ |
 | AC-2 | Colours outside sRGB are gamut-mapped, not clipped | ITEST-2 `TestAC02_GamutMap` | COLOR-3 | ⬜ Todo |
 | AC-3 | Kubelka–Munk reflectance and K/S round-trip | ITEST-2 `TestAC03_KmRoundTrip` | KM-2 | ✅ |
-| AC-4 | Saunderson correction round-trips per medium | ITEST-2 `TestAC04_Saunderson` | KM-3 | ⬜ Todo |
+| AC-4 | Saunderson correction round-trips per medium | ITEST-2 `TestAC04_Saunderson` | KM-3 | ✅ |
 | AC-5 | Two-constant mixing is linear and order-independent | ITEST-2 `TestAC05_TwoConstantMix` | FORWARD-2 (un-pend) · KM-4 (mixing) | ⬜ Todo |
 | AC-6 | The pigment table ships as a medium-tagged build artifact | ITEST-2 `TestAC06_Artifact` | DATA-3 | ⬜ Todo |
 | AC-7 | Every ingested paint round-trips to its published colour | ITEST-2 `TestAC07_RoundTripFidelity` | DATA-5 | ⬜ Todo |
@@ -160,7 +160,7 @@ Pre-seeded augmentations: AC-7/AC-11/AC-21 strengthened by DATA-5/DATA-7/TUNE-3 
 |---|---|---|---|---|
 | CORE | [modules/CORE.md](modules/CORE.md) | Package scaffold; canonical grid; core value types; `MixingEngine` interface + stub engines | — | ✅ Done |
 | COLOR | [modules/COLOR.md](modules/COLOR.md) | Spectrum→XYZ→sRGB backend + OKLCh gamut map | CORE | 🔄 In progress (COLOR-2 ✅) |
-| KM | [modules/KM.md](modules/KM.md) | KM reflectance, Saunderson, two-constant mixing, concentration | CORE | 🔄 In progress (KM-2 ✅) |
+| KM | [modules/KM.md](modules/KM.md) | KM reflectance, Saunderson, two-constant mixing, concentration | CORE | 🔄 In progress (KM-3 ✅; KM-4 next) |
 | DATA | [modules/DATA.md](modules/DATA.md) | Pigment data model, ingest, resample, NNLS/masstone-tint, build artifact, attribution | CORE, COLOR, KM | 🔄 In progress (DATA-1 ✅) |
 | FORWARD | [modules/FORWARD.md](modules/FORWARD.md) | `forward()` engine over measured pigments | COLOR, KM, DATA | ⬜ Todo |
 | SOLVER | [modules/SOLVER.md](modules/SOLVER.md) | `inverse()` palette-constrained solver | FORWARD | ⬜ Todo |
@@ -226,8 +226,8 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 | 9 | COLOR-2 | AC-1 spectrum→colour | ✅ Done | 7.64M | 17m 38s | CMF·D65 weights + spectrumToColour; AC-1 un-pended, green; cov 39/39; grade A |
 | 10 | COLOR-3 | AC-2 gamut map | ⬜ Todo | | | startable (COLOR-2 ✅) ∥ KM-3, DATA-2 |
 | 11 | KM-2 | AC-3 KM round-trip | ✅ Done | 5.87M | 9m 58s (24m) | kmReflectance/kmFunction (−√ root + inverse); AC-3 un-pended, green; cov 11/11; grade A (2 A re-grade) |
-| 12 | KM-3 | AC-4 Saunderson | ⬜ Todo | | | startable (KM-2 ✅) ∥ COLOR-3, DATA-2 |
-| 13 | KM-4 | two-constant mixing (enabler; AC-5 un-pends in FORWARD-2) | ⬜ Todo | | | |
+| 12 | KM-3 | AC-4 Saunderson | ✅ Done | 7.45M | 15m 00s (15m 07s) | full Saunderson (k1,k2 per medium); AC-4 un-pended, green; cov 19/19; grade A (B→A in-phase, fix 1/3; 3 A re-grade) |
+| 13 | KM-4 | two-constant mixing (enabler; AC-5 un-pends in FORWARD-2) | ⬜ Todo | | | startable (KM-3 ✅) ∥ COLOR-3, DATA-2 |
 | 14 | FORWARD-2 | AC-14 normalize + AC-5 un-pend (enabler for forward) | ⬜ Todo | | | |
 | 15 | FORWARD-3 | AC-12 forward fidelity | ⬜ Todo | | | needs G-3/G-4 |
 | 16 | FORWARD-4 | AC-13 desaturation | ⬜ Todo | | | |
@@ -256,9 +256,9 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 
 ## Next phase
 
-**KM-2 (AC-3 KM round-trip) ✅ done** — `kmReflectance` (−√ root) + `kmFunction` in `km/reflectance.dart`; AC-3 un-pended and green; grade A (2 A re-grade of all un-pended tests).
+**KM-3 (AC-4 Saunderson) ✅ done** — full Saunderson correction in `km/saunderson.dart` (`configForMedium`, `saundersonToMeasured` + exact inverse); per-medium documented defaults (acrylic 0.04/0.6, oil 0.05/0.6, authoritative values gated on G-5); AC-4 un-pended and green; grade A (B→A in-phase after the AC-4 test was hardened to pin the k2 term; 3 A re-grade of all un-pended tests).
 
-**Startable now (parallel, disjoint files):** **KM-3** (AC-4 Saunderson, `km/saunderson.dart` — now unblocked by KM-2) ∥ **DATA-2** (AC-8 resample, `data/resample.dart`) ∥ **COLOR-3** (AC-2 gamut map, `colour/oklch.dart`+`gamut_map.dart`). Each in its own session (`--parallel` for concurrency). KM-3 continues the acrylic critical path (COLOR→KM→DATA→FORWARD); then KM-4 (enabler) → FORWARD-2.
+**Startable now (parallel, disjoint files):** **KM-4** (enabler — two-constant mixing, `km/mixing.dart` — now unblocked by KM-3; AC-5 un-pends in FORWARD-2 per G-2) ∥ **DATA-2** (AC-8 resample, `data/resample.dart`) ∥ **COLOR-3** (AC-2 gamut map, `colour/oklch.dart`+`gamut_map.dart`). Each in its own session (`--parallel` for concurrency). KM-4 continues the acrylic critical path (COLOR→KM→FORWARD); KM-4 (enabler) → FORWARD-2. Dataset gates G-3/G-4/G-5 block only the fidelity/real-palette ACs; everything else runs on the synthetic fixture.
 
 Dataset gates G-3/G-4/G-5 block only the fidelity/real-palette ACs (AC-7/9/11/12/21); everything else runs on the synthetic fixture (D-7). G-6 adds held-out validation for AC-17; G-7 gates STRETCH. Routing (G-2): AC-23 = post-prediction state transform (TUNE-4); AC-5 un-pend → FORWARD-2.
 
@@ -281,7 +281,8 @@ Dataset gates G-3/G-4/G-5 block only the fidelity/real-palette ACs (AC-7/9/11/12
 | SIGNOFF-DECISION | 4716a8e4 | 2026-10-16 10:46 EDT | 11:12 | 25m 52s | 5m 30s | claude-opus-4-8 | 66 | 77,272 | 2,826,847 | 24,635 | 2,928,820 | ITEST-5 approved |
 | COLOR-2 | b02bec01 | 2026-10-16 11:40 EDT | 11:58 | 17m 38s | 17m 38s | claude-opus-4-8 | 130 | 195,076 | 7,381,010 | 61,136 | 7,637,352 | AC-1 spectrum→colour: CMF·D65 weights + spectrumToColour; AC-1 un-pended green; analyze clean, unit 78/26/0, coverage PASS (39/39), acceptance 8/26, grade A |
 | KM-2 | 19d8dfed | 2026-10-16 12:12 EDT | 12:36 | 24m 14s | 9m 58s | claude-opus-4-8 | 124 | 151,757 | 5,681,402 | 32,551 | 5,865,834 | AC-3 KM round-trip: kmReflectance/kmFunction; AC-3 un-pended green; analyze clean, unit 87/25/0, coverage PASS (11/11), acceptance 9/25, grade A (2 A re-grade) |
-| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-16 12:36** | **3h 43m** | **2h 39m** |  | **1,174** | **1,902,105** | **65,277,754** | **610,232** | **67,791,265** |  |
+| KM-3 | 5a2d2947 | 2026-10-16 12:59 EDT | 13:14 | 15m 07s | 15m 00s | claude-opus-4-8 | 150 | 238,821 | 7,168,361 | 44,906 | 7,452,238 | AC-4 Saunderson: un-pended & green; cov 19/19; grade A (B→A in-phase, fix 1/3) |
+| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-16 13:14** | **3h 59m** | **2h 54m** |  | **1,324** | **2,140,926** | **72,446,115** | **655,138** | **75,243,503** |  |
 
 ## Sign-off
 

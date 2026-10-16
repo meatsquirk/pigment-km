@@ -14,7 +14,6 @@ void main() {
   final spectrum = Float32List.fromList(
     List<double>.filled(CanonicalGrid.bins, 0.5),
   );
-  const config = MediumConfig(medium: Medium.acrylic, k1: 0.04, k2: 0.6);
 
   const target = ColourValue(
     srgb: (r: 0.1, g: 0.2, b: 0.3),
@@ -27,26 +26,6 @@ void main() {
     // only the gamutMap stub remains until COLOR-3.
     test('gamutMap — COLOR-3', () {
       expect(() => gamutMap(target), throwsUnimplementedError);
-    });
-  });
-
-  group('KM physics stubs throw their documented UnimplementedError', () {
-    // kmReflectance/kmFunction are implemented in KM-2 (see test/km_test.dart);
-    // only the Saunderson stubs remain until KM-3.
-    test('configForMedium — KM-3', () {
-      expect(() => configForMedium(Medium.acrylic), throwsUnimplementedError);
-    });
-    test('saundersonToMeasured — KM-3', () {
-      expect(
-        () => saundersonToMeasured(spectrum, config),
-        throwsUnimplementedError,
-      );
-    });
-    test('saundersonToInternal — KM-3', () {
-      expect(
-        () => saundersonToInternal(spectrum, config),
-        throwsUnimplementedError,
-      );
     });
   });
 

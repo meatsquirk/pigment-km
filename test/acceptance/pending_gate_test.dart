@@ -11,6 +11,7 @@ import 'harness/harness.dart';
 const Map<String, String> unpendedACs = <String, String>{
   'AC-1': 'COLOR-2',
   'AC-3': 'KM-2',
+  'AC-4': 'KM-3',
 };
 
 /// Guards the pending gate itself (never pending). The assertions pin the full

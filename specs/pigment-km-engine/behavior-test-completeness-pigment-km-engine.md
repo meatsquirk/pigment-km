@@ -88,3 +88,24 @@ passes 0/3.
 |---|---|---|---|
 | AC-1 | TestAC01_SpectrumToColour | A (re-confirmed) | Code unchanged since COLOR-2. Given checked through the public surface (spectrum length 31, published XYZ = D65 white, published sRGB = white); When runs real `spectrumToColour`; Then ΔE00 ≤ 1 vs the independent CIEDE2000 yardstick + Y≈1 + sRGB white. Rejects a backend that drops `yBarD65Sum` normalization or mis-weights the illuminant. Same unchanged G5-floor flag (single white fixture; a non-white published target hardens it post DATA-5). |
 | AC-3 | TestAC03_KmRoundTrip | A | Now live against the real KM physics. Given checked through the public surface (`koverS` from `synthPigments()`, each bin finite and > 0) before the When; When runs the real barrel `kmReflectance` → `kmFunction`. Three independent Thens pin the physics: (1) reflectance ∈ [0,1] at every bin — **rejects the wrong (+√) root** (R>1 for x>0; the round-trip alone cannot, since the two roots are reciprocals and f(R)=f(1/R)); (2) K/S=0 → R=1 (1e-5) known reference point; (3) `kmFunction∘kmReflectance` round-trips to 1e-5 — rejects a dropped constant in f(R) (e.g. missing the 2× doubles K/S). Prior "fixed in-phase (was B/G5)" note confirmed holding green against real code. |
+
+## Behaviour re-grade — KM-3 (un-pended AC-1, AC-3, AC-4) · graded 2026-10-16
+
+Grader: fresh independent adversarial subagent, G1–G6; given the Band 1 + KM-2
+grids and asked to justify any downgrade against a named rule. First pass found
+**AC-4 = B** (G5/concern-c): `TestAC04_Saunderson`'s round-trip is mutually-inverse
+by construction and the two controls differ only in `k1`, so a k2-dropping forward
+`R_m = k1 + (1−k1)·R_i` (invertible, per-medium distinct) passed — the k2
+internal-reflection term was unverified, and the suite has no other Saunderson
+check (AC-7 renders with no Saunderson step). **Fixed in-phase (fix pass 1/3):**
+added an independent full-formula forward reference `refMeasured` asserted per bin
+for **both** media + a hand-computed fixed anchor (R_i=0.2 → R_m=0.12727273) + the
+documented-constant pin. A second fresh grader re-graded **AC-4 = A**, tracing that
+the no-op, single-global-k1,k2, and k2-dropping forwards now each fail ≥2
+assertions. Result: **3 A** (AC-1, AC-3 re-confirmed; AC-4 B→A).
+
+| AC | Test | Grade | Notes |
+|---|---|---|---|
+| AC-1 | TestAC01_SpectrumToColour | A (re-confirmed) | Code untouched by KM-3 (no shared helper touched). Same unchanged G5-floor flag (single white fixture; a non-white published target hardens it post DATA-5). |
+| AC-3 | TestAC03_KmRoundTrip | A (re-confirmed) | `reflectance.dart` untouched by KM-3; range check still rejects the +√ root, round-trip 1e-5 still rejects a dropped f(R) constant. |
+| AC-4 | TestAC04_Saunderson | A | **B→A, fixed in-phase.** Round-trip per bin (1e-5) + independent full-formula `refMeasured` per bin for acrylic **and** oil + hand anchor (bin 0 = 0.12727273) + distinctness & not-no-op controls. Pins the k2 term; rejects no-op, one global k1,k2, and the k2-dropping forward. *Flags (non-blocking): the test pins the documented defaults k1=0.04/k2=0.6 and the 0.12727273 anchor, so G-5's authoritative constants must update pin+anchor in lockstep; acrylic/oil share k2=0.6 (differ only in k1), but k2 is fully pinned via `refMeasured` + anchor rather than the medium contrast.* |
