@@ -1,7 +1,7 @@
 # Master Plan — pigment_km: measured-pigment Kubelka–Munk mixing engine
 
 **Spec:** [pigment-km-engine.feature](../pigment-km-engine.feature)
-**Status:** Not started — next CORE-1 (blocked by G-1: approve the spec)
+**Status:** In progress — next CORE-2 (shell)
 **Architecture:** [Nuance/docs/custom-mixing-engine-design.md](../../../Nuance/docs/custom-mixing-engine-design.md) (physics §3, datasets §4, forward/inverse §6, tuning §7, staged plan §8, licensing §13) · [Nuance/docs/paint-color-app-solution-intent.md](../../../Nuance/docs/paint-color-app-solution-intent.md) (D3/D6/D7/D9, accuracy NFRs) · consumption contract: `Nuance/lib/recipes/engine/mixing_engine.dart` (bs-04)
 **Code home:** `/Users/matthew.quirk/pigment_km` · remote `https://github.com/meatsquirk/pigment-km` (origin, pushed) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
 
@@ -158,7 +158,7 @@ Pre-seeded augmentations: AC-7/AC-11/AC-21 strengthened by DATA-5/DATA-7/TUNE-3 
 
 | Module | Plan | Purpose | Depends on | Status |
 |---|---|---|---|---|
-| CORE | [modules/CORE.md](modules/CORE.md) | Package scaffold; canonical grid; core value types; `MixingEngine` interface + stub engines | — | ⬜ Todo |
+| CORE | [modules/CORE.md](modules/CORE.md) | Package scaffold; canonical grid; core value types; `MixingEngine` interface + stub engines | — | 🔄 In progress |
 | COLOR | [modules/COLOR.md](modules/COLOR.md) | Spectrum→XYZ→sRGB backend + OKLCh gamut map | CORE | ⬜ Todo |
 | KM | [modules/KM.md](modules/KM.md) | KM reflectance, Saunderson, two-constant mixing, concentration | CORE | ⬜ Todo |
 | DATA | [modules/DATA.md](modules/DATA.md) | Pigment data model, ingest, resample, NNLS/masstone-tint, build artifact, attribution | CORE, COLOR, KM | ⬜ Todo |
@@ -195,7 +195,7 @@ graph LR
 
 | Gate | Kind | Decision needed | Blocks | Status |
 |---|---|---|---|---|
-| G-1 | decision | Approve the spec (record the approval as its first line) | CORE-1 | Open |
+| G-1 | decision | Approve the spec (record the approval as its first line) | CORE-1 | ✅ Resolved 2026-10-16: spec approved as-is, recorded as its first line — Matt Quirk |
 | G-2 | decision | Approve the acceptance tests (ITEST-5's packet) | every behavior phase | Open |
 | G-3 | dependency | Obtain + archive the Golden/RIT acrylic K,S data; confirm its exact fields, grid, S-normalization and k1,k2 (design §4 action #2) and the agreed attribution wording with Berns/MCSL (permission granted 2026-10-15) | DATA-5, DATA-7, FORWARD-3, TUNE-3 (real palette) | Open |
 | G-4 | dependency | Obtain the MPI Old Holland oil dataset (CC BY 4.0 — clear) and its mixtures | DATA-6 | Open |
@@ -215,8 +215,8 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 
 | # | Phase | Target | Status | Tokens | Time | Notes |
 |---|---|---|---|---|---|---|
-| 1 | CORE-1 | scaffold: package, `dart test`+coverage gate, baseline, acceptance runner | ⬜ Next | | | blocked by G-1 |
-| 2 | CORE-2 | shell: core types + `MixingEngine` interface + stub engines + canonical grid | ⬜ Todo | | | |
+| 1 | CORE-1 | scaffold: package, `dart test`+coverage gate, baseline, acceptance runner | ✅ Done | 3.61M | 6m44s (33m) | G-1 resolved; gate proven |
+| 2 | CORE-2 | shell: core types + `MixingEngine` interface + stub engines + canonical grid | ⬜ Next | | | |
 | 3 | DATA-1 | shell: build-artifact format + loader + synthetic fixture + attribution scaffolding | ⬜ Todo | | | |
 | 4 | ITEST-1 | acceptance-tests: harness, fixtures, pending gate (all 27), smoke | ⬜ Todo | | | |
 | 5 | ITEST-2 | acceptance-tests: AC-1..9 (pending) + red baseline | ⬜ Todo | | | ∥ ITEST-3/4 |
@@ -256,9 +256,9 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 
 ## Next phase
 
-**CORE-1 (scaffold)** is next but **blocked by G-1 (approve the spec)**. The spec is a draft derived from the design doc; a human must record approval as its first line before scaffolding.
-Also pending, not blocking CORE-1: G-3/G-4 (obtain the datasets — permission for Golden/RIT granted 2026-10-15, files not yet on disk; MPI oil is CC BY 4.0). The scaffold, shells, acceptance suite and most behavior run against the synthetic fixture (D-7); only the fidelity ACs (AC-7/9/12) and the real curated palette block on the data.
-Recommended delivery order once unblocked: the acrylic S0→S2 critical path first (CORE→COLOR→KM→DATA→FORWARD) to reach the Phase-0.5 round-trip/ΔE00 gate, then SOLVER (S3), TUNE (S4), PROD (S5); STRETCH (S6) only if G-7 says so.
+**CORE-2 (shell)** is next — startable now (G-1 resolved, CORE-1 done). Build the core value types + `CanonicalGrid` (31 bins) + `Spectrum` alias + `abstract interface class MixingEngine` + stub `CustomKmEngine`/`SpectralBaselineEngine` (throw `UnimplementedError`, incl. the `reflectanceOf` read endpoint); export the public surface from `lib/pigment_km.dart` (replacing the scaffold's `packageVersion()` marker). Unit-cover constructors/equality/grid invariant to 100%.
+After CORE-2: DATA-1 (shell) can run (∥-friendly, different files), then ITEST-1→ITEST-2∥3∥4→ITEST-5 (test review → G-2) gate the behavior stage.
+Dataset gates still open (block only fidelity/real-palette ACs): G-3/G-4/G-5 (datasets not yet on disk — Golden/RIT permission granted 2026-10-15, MPI oil CC BY 4.0). Scaffold/shells/acceptance/most behavior use the synthetic fixture (D-7). Recommended order once ITEST-5 approved: acrylic S0→S2 critical path (CORE→COLOR→KM→DATA→FORWARD) to the Phase-0.5 ΔE00 gate, then SOLVER (S3), TUNE (S4), PROD (S5); STRETCH (S6) only if G-7 says so.
 
 ## Token usage
 
@@ -268,7 +268,8 @@ Recommended delivery order once unblocked: the acrylic S0→S2 critical path fir
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | PLAN | <this> | | | | | opus-4-8 | | | | | | plan written |
 | PLAN | c99d445d | 2026-10-15 21:14 EDT | 21:32 | 18m 36s | 16m 07s | claude-opus-4-8 | 50 | 156,218 | 3,218,973 | 75,301 | 3,450,542 | plan written |
-| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-15 21:32** | **18m 36s** | **16m 07s** |  | **50** | **156,218** | **3,218,973** | **75,301** | **3,450,542** |  |
+| CORE-1 | e9114773 | 2026-10-16 05:48 EDT | 06:21 | 32m 58s | 6m 44s | claude-opus-4-8 | 86 | 76,569 | 3,510,091 | 26,207 | 3,612,953 | scaffold done; coverage gate proven; G-1 approved |
+| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-16 06:21** | **51m 34s** | **22m 51s** |  | **136** | **232,787** | **6,729,064** | **101,508** | **7,063,495** |  |
 
 ## Sign-off
 

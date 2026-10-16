@@ -1,0 +1,17 @@
+# Dart / pub
+.dart_tool/
+.packages
+build/
+
+# A library package pins nothing: let consumers resolve. Keep lockfile out of VCS.
+pubspec.lock
+
+# Coverage artifacts (produced by tool/coverage_gate.sh)
+coverage/
+*.lcov
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store

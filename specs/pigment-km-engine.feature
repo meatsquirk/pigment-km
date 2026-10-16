@@ -1,7 +1,7 @@
+# APPROVED 2026-10-16 by Matt Quirk (gate G-1) — spec accepted as-is; scaffolding unblocked.
 # Feature spec — pigment_km: measured-pigment Kubelka–Munk mixing engine
 #
-# Status: DRAFT — NOT YET APPROVED (gate G-1 blocks the scaffold phase until a human
-#   records approval as the first line of this file, as the sibling Nuance specs carry one).
+# Status: APPROVED 2026-10-16 (G-1). Was DRAFT, derived 2026-10-15 from the design doc.
 #
 # Derivation: this spec was derived (2026-10-15) by Claude from
 #   Nuance/docs/custom-mixing-engine-design.md (the "B2" in-house measured-pigment engine
