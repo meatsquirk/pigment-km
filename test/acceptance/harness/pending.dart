@@ -13,7 +13,6 @@ import 'dart:io';
 /// ITEST-1 seeds all 27 ACs as pending; ITEST-2/3/4 add one test per AC.
 const Map<String, String> pendingACs = <String, String>{
   'AC-2': 'COLOR-3',
-  'AC-5': 'KM-4',
   'AC-6': 'DATA-3',
   'AC-7': 'DATA-5',
   'AC-8': 'DATA-2',
@@ -22,7 +21,6 @@ const Map<String, String> pendingACs = <String, String>{
   'AC-11': 'DATA-7',
   'AC-12': 'FORWARD-3',
   'AC-13': 'FORWARD-4',
-  'AC-14': 'FORWARD-2',
   'AC-15': 'SOLVER-3',
   'AC-16': 'SOLVER-2',
   'AC-17': 'SOLVER-6',

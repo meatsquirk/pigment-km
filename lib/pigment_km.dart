@@ -16,6 +16,7 @@ export 'src/data/masstone_tint.dart';
 export 'src/data/pigment_table.dart';
 export 'src/data/resample.dart';
 export 'src/engine/custom_km_engine.dart';
+export 'src/engine/forward.dart' show normalizeParts;
 export 'src/engine/mixing_engine.dart';
 export 'src/engine/spectral_baseline_engine.dart';
 export 'src/grid.dart';

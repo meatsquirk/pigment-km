@@ -220,26 +220,50 @@ void main() {
       expect(rawSum, closeTo(3.0, 1e-12));
       expect((rawSum - 1.0).abs() > 0.5, isTrue,
           reason: 'the Given parts must not already sum to 1');
-      // The same ratio normalized to sum 1.
-      final normalized = <String, double>{white.id: 2 / 3, blue.id: 1 / 3};
-      expect(normalized.values.fold<double>(0, (a, b) => a + b),
-          closeTo(1.0, 1e-12));
 
-      // WHEN the engine predicts the raw mixture.
-      final rawResult = engine.forward(raw);
-      final normResult = engine.forward(normalized);
+      // WHEN the parts are normalized to concentration weights (the public
+      // normalization the engine applies before mixing — design §5).
+      final concentrations = normalizeParts(raw);
 
-      // THEN the raw result equals the normalized result — the parts are
-      // normalized to sum 1 and map directly to the concentration weights.
-      expect(deltaE00(rawResult.xyz, normResult.xyz), lessThan(1e-6),
-          reason: 'parts must be normalized to Σ1 before mixing');
-      // CONTROL: another scaling of the SAME ratio (6:3) also matches — rejects
-      // an engine that uses the raw (unnormalized) weights.
-      final scaled = engine.forward({white.id: 6.0, blue.id: 3.0});
-      expect(deltaE00(scaled.xyz, normResult.xyz), lessThan(1e-6),
+      // THEN they sum to 1 and map directly to the concentration weights,
+      // preserving the input 2:1 ratio EXACTLY. This is the AC's observable: it
+      // REJECTS a non-normalizing (identity) implementation, which would leave
+      // the weights at 2.0/1.0 (sum 3, not 1). The colour-only surface cannot
+      // reject it on its own — the opaque two-constant forward is scale-invariant
+      // (K/S = Σv·K / Σv·S is unchanged by rescaling all volumes), so asserting
+      // the normalization itself is the only discriminating check.
+      final normSum = concentrations.values.fold<double>(0, (a, b) => a + b);
+      expect(normSum, closeTo(1.0, 1e-12),
+          reason: 'normalized concentration weights must sum to 1');
+      expect(concentrations[white.id], closeTo(2 / 3, 1e-12));
+      expect(concentrations[blue.id], closeTo(1 / 3, 1e-12));
+      expect(concentrations[white.id]! / concentrations[blue.id]!,
+          closeTo(2.0, 1e-12),
+          reason: 'the 2:1 input ratio must be preserved by normalization');
+      expect(concentrations[white.id], isNot(closeTo(raw[white.id]!, 1e-9)),
+          reason: 'a non-normalizing identity map (the rejected impl) would '
+              'leave the weight at 2.0');
+      // Idempotent on an already-normalized input (sums stay 1, no double-scale).
+      final already = normalizeParts({white.id: 2 / 3, blue.id: 1 / 3});
+      expect(already[white.id], closeTo(2 / 3, 1e-12));
+      expect(already[blue.id], closeTo(1 / 3, 1e-12));
+
+      // AND the engine's forward maps the raw parts directly onto those
+      // concentration weights: the raw mix predicts the same colour as the
+      // explicitly-normalized mix, and so does any other positive scaling of the
+      // same ratio (the concentration model — scale-invariant in the volume
+      // ratio). This is a consistency property, not the normalization reject
+      // above (a scale-invariant forward matches here with or without the
+      // internal normalize call).
+      final normResult = engine.forward({white.id: 2 / 3, blue.id: 1 / 3});
+      expect(deltaE00(engine.forward(raw).xyz, normResult.xyz), lessThan(1e-6),
+          reason: 'raw parts must predict the same colour as the normalized mix');
+      expect(deltaE00(engine.forward({white.id: 6.0, blue.id: 3.0}).xyz,
+              normResult.xyz),
+          lessThan(1e-6),
           reason: 'any scaling of the same ratio must give the same colour');
       // CONTROL: a DIFFERENT ratio gives a different colour — rejects an engine
-      // that collapses every mixture to the same result.
+      // that collapses every mixture to the same result (ignores volumes).
       final otherRatio = engine.forward({white.id: 1.0, blue.id: 2.0});
       expect(deltaE00(otherRatio.xyz, normResult.xyz), greaterThan(1e-3),
           reason: 'a different ratio must change the predicted colour');

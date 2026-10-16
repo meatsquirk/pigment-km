@@ -109,3 +109,31 @@ assertions. Result: **3 A** (AC-1, AC-3 re-confirmed; AC-4 B→A).
 | AC-1 | TestAC01_SpectrumToColour | A (re-confirmed) | Code untouched by KM-3 (no shared helper touched). Same unchanged G5-floor flag (single white fixture; a non-white published target hardens it post DATA-5). |
 | AC-3 | TestAC03_KmRoundTrip | A (re-confirmed) | `reflectance.dart` untouched by KM-3; range check still rejects the +√ root, round-trip 1e-5 still rejects a dropped f(R) constant. |
 | AC-4 | TestAC04_Saunderson | A | **B→A, fixed in-phase.** Round-trip per bin (1e-5) + independent full-formula `refMeasured` per bin for acrylic **and** oil + hand anchor (bin 0 = 0.12727273) + distinctness & not-no-op controls. Pins the k2 term; rejects no-op, one global k1,k2, and the k2-dropping forward. *Flags (non-blocking): the test pins the documented defaults k1=0.04/k2=0.6 and the 0.12727273 anchor, so G-5's authoritative constants must update pin+anchor in lockstep; acrylic/oil share k2=0.6 (differ only in k1), but k2 is fully pinned via `refMeasured` + anchor rather than the medium contrast.* |
+
+## Behaviour re-grade — FORWARD-2 (un-pended AC-5, AC-14; re-confirmed AC-1, AC-3, AC-4) · graded 2026-10-16
+
+Grader: fresh independent adversarial subagent, G1–G6; given the prior grids and
+asked to justify any downgrade against a named rule, now that
+`CustomKmEngine.forward` is live (two-constant mixing → K/S → KM reflectance →
+Saunderson → spectrum→colour). First pass found **AC-14 = B** (G5, secondary G4):
+the opaque two-constant forward is **scale-invariant in the volume weights**
+(`K/S = Σv·K / Σv·S` is unchanged by rescaling all volumes), so a non-normalizing
+engine predicts the *same* colour as a normalizing one — the old AC-14 test, which
+asserted only `forward(raw)==forward(normalized)` and the `6:3` scaling through the
+colour surface, could not reject its named raw-weight impl (the grader built that
+non-normalizing pipeline and got bit-identical XYZ). **Fixed in-phase (fix pass
+1/3):** exposed `normalizeParts` on the public surface (`pigment_km.dart`) — the
+spec step explicitly names "parts normalized to sum 1" as the observable — and
+rewrote AC-14 to assert the normalization directly (Σ=1, {2/3,1/3}, ratio
+preserved, `≠ raw 2.0`), which rejects the identity/non-normalizing map, while the
+scale-invariance is kept as an honestly-labelled consistency property (not the
+reject). A second fresh grader re-graded **AC-14 = A**. Result: **5 A** (AC-1, AC-3,
+AC-4 re-confirmed; AC-5 re-confirmed now-live; AC-14 B→A).
+
+| AC | Test | Grade | Notes |
+|---|---|---|---|
+| AC-1 | TestAC01_SpectrumToColour | A (re-confirmed) | Untouched by FORWARD-2. ΔE00 ≤ 1 to the D65 white point + Y≈1 + sRGB white; rejects dropped `yBarD65Sum`/mis-weighted illuminant. Unchanged single-white G5-floor flag. |
+| AC-3 | TestAC03_KmRoundTrip | A (re-confirmed) | `reflectance.dart` untouched. R∞∈[0,1] per bin rejects the +√ branch; K/S=0→R=1 anchor; round-trip 1e-5. |
+| AC-4 | TestAC04_Saunderson | A (re-confirmed) | `saunderson.dart` untouched. Independent full-formula `refMeasured` per bin for both media + hand anchor (0.12727273) + distinctness controls; pins the k2 term. G-5 lockstep flag unchanged. |
+| AC-5 | TestAC05_TwoConstantMix | A | Now live through the real `forward`. Self-mix idempotence (0.3≡0.9≡pure, ΔE00<1e-6) + order-independence (ab≡ba, from `mixTwoConstant`'s Float64-accumulate-then-narrow) + Control 1 (mix ≠ each pure, >1) + Control 2 (25/75 ≠ 75/25 ≠ 50/50 — genuinely different K/S ratios, not a rescale). Rejects order-dependence, collapse-to-one-component, and a volume-ignoring mix. Non-vacuous; consistent with the prior hardened A. |
+| AC-14 | TestAC14_Normalize | A | **B→A, fixed in-phase (fix pass 1/3).** Asserts the public `normalizeParts` observably — Σ=1, {2/3,1/3}, 2:1 ratio preserved, `≠ raw 2.0`, idempotent on an already-normalized input — which **rejects the identity (non-normalizing) impl** the colour-only surface cannot (the opaque forward is scale-invariant). The `forward(raw)==forward(normalized)==forward(6:3)` equalities are kept as an honestly-labelled scale-invariance consistency property (explicitly NOT the reject), plus a "different ratio → different colour" control rejecting a volume-ignoring engine. The engine genuinely routes through `normalizeParts` (forward.dart `forwardReflectance`). |

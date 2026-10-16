@@ -7,15 +7,13 @@ import 'harness/harness.dart';
 /// reachable end to end through the package's public surface, and that the
 /// harness fixtures construct. It asserts only what is true at the shell stage.
 ///
-/// NOTE (drift from the plan task, resolved): the ITEST-1 task names a smoke
-/// that "forward of the synthetic white returns a near-white". The forward
-/// model is an UnimplementedError stub until the FORWARD phases land, so that
-/// assertion cannot hold yet. The available end-to-end wiring proof at the shell
-/// stage is: both engines construct through the public barrel, the pigment
-/// tables load through the public loader, and forward/reflectanceOf are reachable
-/// and throw the *documented* UnimplementedError (not a missing-method error).
-/// FORWARD-3 strengthens the forward case below to the near-white assertion
-/// (see the ITEST checkpoint).
+/// NOTE (updated at FORWARD-2): the forward model is now live, so the former
+/// "forward throws UnimplementedError" wiring proof is replaced by the real
+/// end-to-end check — forward/reflectanceOf of the synthetic white run through
+/// the public surface and return a valid, physically sensible result. (The
+/// synthetic white is a flat-spectrum achromatic stand-in, so its predicted
+/// colour is a light neutral, not literally white — AC-5/AC-14 cover the
+/// mixing/normalization behaviour; this only proves the pipeline is wired.)
 void main() {
   group('acceptance harness smoke', () {
     test('both engines construct through the public surface as MixingEngine',
@@ -37,20 +35,26 @@ void main() {
       }
     });
 
-    test('the forward model is wired and reachable (throws the documented '
-        'UnimplementedError until FORWARD lands)', () {
-      // Shell-stage wiring proof: forward of the synthetic white is reachable
-      // through the public surface. FORWARD-3 strengthens this to assert the
-      // predicted colour is near-white.
+    test('the forward model is wired and reachable end to end (FORWARD-2)', () {
+      // End-to-end wiring proof: forward/reflectanceOf of the synthetic white run
+      // through the public surface and return a physically sensible result.
       final whiteMix = <String, double>{synthWhite().id: 1.0};
-      expect(
-        () => customEngine().forward(whiteMix),
-        throwsA(isA<UnimplementedError>()),
-      );
-      expect(
-        () => customEngine().reflectanceOf(whiteMix),
-        throwsA(isA<UnimplementedError>()),
-      );
+
+      final reflectance = customEngine().reflectanceOf(whiteMix);
+      expect(reflectance, hasLength(CanonicalGrid.bins));
+      expect(reflectance.every((v) => v >= 0.0 && v <= 1.0), isTrue,
+          reason: 'measured reflectance must be physical (0..1)');
+
+      final colour = customEngine().forward(whiteMix);
+      for (final ch in <double>[colour.srgb.r, colour.srgb.g, colour.srgb.b]) {
+        expect(ch, inInclusiveRange(0.0, 1.0));
+      }
+      // The white pigment is a flat-spectrum achromatic stand-in, so its
+      // predicted colour is a light neutral: near-zero chroma and r≈g≈b.
+      expect(colour.oklch.c, lessThan(0.02),
+          reason: 'a flat-spectrum white must predict a near-neutral colour');
+      expect((colour.srgb.r - colour.srgb.g).abs(), lessThan(0.02));
+      expect((colour.srgb.g - colour.srgb.b).abs(), lessThan(0.02));
     });
 
     test('harness fixtures construct', () {
