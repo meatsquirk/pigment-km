@@ -62,5 +62,16 @@ void main() {
         throwsUnimplementedError,
       );
     });
+    test('deriveKsFromMasstoneTint — DATA-4 (added ITEST-3, Option A)', () {
+      expect(
+        () => deriveKsFromMasstoneTint(
+          masstone: spectrum,
+          tints: <Tint>[(pigmentFraction: 0.5, reflectance: spectrum)],
+          whiteK: spectrum,
+          whiteS: spectrum,
+        ),
+        throwsUnimplementedError,
+      );
+    });
   });
 }

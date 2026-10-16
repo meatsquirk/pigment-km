@@ -11,7 +11,7 @@
 |---|---|---|---|---|---|
 | 1 (ITEST-1) | acceptance-tests | — (harness) | ✅ Done | 5.53M | 12m 21s |
 | 2 (ITEST-2) | acceptance-tests | AC-1..9 | ✅ Done | 10.94M | 30m 21s |
-| 3 (ITEST-3) | acceptance-tests | AC-10..18 | ⬜ Todo | | |
+| 3 (ITEST-3) | acceptance-tests | AC-10..18 | ✅ Done | 10.79M | 22m 28s |
 | 4 (ITEST-4) | acceptance-tests | AC-19..27 | ⬜ Todo | | |
 | 5 (ITEST-5) | test-review | — | ⬜ Todo | | |
 
@@ -82,7 +82,26 @@
 - **Kind:** acceptance-tests · **Target AC:** AC-10..AC-18 · **Depends on:** ITEST-1 · **Blocks:** ITEST-5 · ∥ ITEST-2/4
 - **Tasks/Exit:** as ITEST-2 for `TestAC10..TestAC18`.
 
-### Result · Checkpoint  <!-- filled on completion -->
+### Result · Checkpoint
+
+**Result.** The AC-10..AC-18 pending acceptance tests (`test/acceptance/ac10_18_test.dart`), each through the public surface, each gated by `skip: ac('AC-n')`.
+
+- **Option A (ITEST-2 precedent, applied to AC-10):** AC-10's masstone–tint derivation had no public surface (the shell stage stubbed only the engine methods + the ITEST-2 COLOR/KM/ingest functions). Added the minimal public stub `deriveKsFromMasstoneTint({masstone, tints, whiteK, whiteS}) → ({k, s})` + `Tint` typedef in `lib/src/data/masstone_tint.dart` (signature from the DATA-4 module plan), exported from the barrel, throwing `UnimplementedError('… — DATA-4')`. `test/backends_stub_test.dart` covers it 100% in the default run (where the acceptance pending tests are skipped). The body is DATA-4's to fill; signature frozen here (change only with a recorded reason). The file now appears in DATA's *Owns*.
+- **New fixture:** `measuredMixturesPlaceholder` ({table, mixtures?, isReal}) added to `fixtures.dart` for AC-12 — a placeholder (isReal=false, mixtures=null) FORWARD-3 populates with the real measured mixtures.
+- **Independent reference maths:** added `srgbToXyz`, `srgbToOklch`, `colourFromSrgb`, `hueDiffDeg` to the harness `colour_math.dart` (standard linear-sRGB→XYZ D65 matrix + Ottosson OKLab), so solver targets carry consistent sRGB/XYZ/OKLCh and AC-13's desaturation is measured against a trusted yardstick. AC-10's two-constant KM reference (`_tintReflectance`) is local to the test — AC-10 calls **no** library KM, so the derivation is checked against wholly independent physics. All verified by the grader against known values (pure green → oogColour's XYZ/OKLCh; white → D65 white point).
+- **Verification (green):** `dart analyze` → No issues · default `dart test` → **70 passed / 18 skipped** (+1 = the DATA-4 stub coverage test) · default `dart test test/acceptance` → **7 passed / 18 skipped** · coverage gate → **PASS** (`masstone_tint.dart` 2/2 lines; barrel export has no executable lines).
+- **Red baseline** (`PIGMENT_KM_RUN_PENDING=true dart test test/acceptance/ac10_18_test.dart`): **−9 / +0** — every test fails for the right reason (per-AC rows below). AC-10/13/14 on their When (`UnimplementedError`), AC-15..18 on their When (`inverse — SOLVER phases`), AC-11/AC-12 on a Given precondition naming their owning phase.
+- **Grades:** fresh independent subagent (G1–G6 + catalogue) → initial 6 A, 2 A (data-limited), **1 B (AC-15)**. AC-15 fixed in-phase: added `recipes.length ≥ 2` so the best-first ordering check is non-vacuous (rejects a single-recipe unranked solver); the prefer-fewer-on-tie reject is augmentation-tracked (SOLVER-3 builds a guaranteed 2-vs-3-paint tie). **Final: 9 A** (AC-11, AC-12 data-limited). Grid: `behavior-test-completeness-pigment-km-engine.md` Band 2.
+- **Fix passes:** 1/3 (the AC-15 vacuity).
+
+**Checkpoint / Handoff.**
+- **Frozen for the behaviour phases (un-pend = delete the AC's row in `pending.dart`):**
+  - **DATA-4** fills `deriveKsFromMasstoneTint` (signature frozen here); **DATA-7** flips `acrylicPublishedPlaceholder.isReal` + finalizes the Golden/RIT NOTICE wording and makes the real acrylic paints `Provenance.calculated` (AC-11's precondition + real-source Then); **FORWARD-3** populates `measuredMixturesPlaceholder.mixtures` with ≥1 real multi-paint mixture + published colour (AC-12).
+  - **FORWARD-2** (AC-14) / **FORWARD-4** (AC-13) fill `CustomKmEngine.forward`; **FORWARD-3** (AC-12) too. **SOLVER-2/3/4/6** fill `CustomKmEngine.inverse`.
+  - ⚠ **AC-15 augmentation (SOLVER-3):** the fewer-paint-on-tie rule is only exercised by a constructed equal-ΔE00 tie the solver produces — SOLVER-3 must add a 2-vs-3-paint tie case asserting the 2-paint recipe ranks first, then close the augmentation row. The `≥ 2 recipes` assertion already requires this target+palette to yield ≥2 ranked recipes.
+  - ⚠ **AC-17 (SOLVER-6):** the in-gamut target `colourFromSrgb((0.72,0.76,0.86))` is assumed reachable; SOLVER-6 confirms/tunes it to a known-reachable target (G-6 adds held-out ΔE00 validation evidence).
+- **Verification (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"` first. `dart analyze` · `dart test` · acceptance default/red-baseline as above · `bash tool/coverage_gate.sh <BASE>` (line-only).
+- **Next:** **ITEST-4** (AC-19..27, tag AC-26/27 `@stretch`) — last AC-test band; then **ITEST-5** test review → **G-2** gates the whole behaviour stage.
 
 ## Phase 4 — ITEST-4: AC-19..27 (pending) + red baseline
 - **Kind:** acceptance-tests · **Target AC:** AC-19..AC-27 · **Depends on:** ITEST-1 · **Blocks:** ITEST-5 · ∥ ITEST-2/3
@@ -111,7 +130,16 @@
 | AC-7 | TestAC07_RoundTripFidelity | fail | Given precondition — real acrylic + published colours absent (G-3/DATA-5) | DATA-5 | A (data-limited) |
 | AC-8 | TestAC08_Resample | fail | When — `UnimplementedError: resampleOntoCanonical — DATA-2` | DATA-2 | A |
 | AC-9 | TestAC09_OilFit | fail | Given precondition — MPI oil data absent (G-4/DATA-6) | DATA-6 | B pending DATA-6 |
-| … | (AC-10..27 filled ITEST-3/4) | | | | |
+| AC-10 | TestAC10_MasstoneTint | fail | When — `UnimplementedError: deriveKsFromMasstoneTint — DATA-4` | DATA-4 | A |
+| AC-11 | TestAC11_Attribution | fail | Given precondition — real acrylic data absent (G-3/DATA-5); LICENSE/NOTICE Thens pass | DATA-7 | A (data-limited) |
+| AC-12 | TestAC12_ForwardFidelity | fail | Given precondition — real measured mixtures absent (G-3/G-4) | FORWARD-3 | A (data-limited) |
+| AC-13 | TestAC13_Desaturation | fail | When — `UnimplementedError: CustomKmEngine.forward — FORWARD phases` | FORWARD-4 | A |
+| AC-14 | TestAC14_Normalize | fail | When — `UnimplementedError: CustomKmEngine.forward — FORWARD phases` | FORWARD-2 | A |
+| AC-15 | TestAC15_RankedPreferFewer | fail | When — `UnimplementedError: CustomKmEngine.inverse — SOLVER phases` | SOLVER-3 | A |
+| AC-16 | TestAC16_PaletteOnly | fail | When — `UnimplementedError: CustomKmEngine.inverse — SOLVER phases` | SOLVER-2 | A |
+| AC-17 | TestAC17_InGamut | fail | When — `UnimplementedError: CustomKmEngine.inverse — SOLVER phases` | SOLVER-6 | A |
+| AC-18 | TestAC18_OutOfGamut | fail | When — `UnimplementedError: CustomKmEngine.inverse — SOLVER phases` | SOLVER-4 | A |
+| … | (AC-19..27 filled ITEST-4) | | | | |
 
 ## Test augmentations  <!-- pre-seeded; confirmed by AC-test phases; closed by behavior phases -->
 
@@ -119,6 +147,7 @@
 |---|---|---|---|---|
 | TestAC07 | real Golden/RIT data + published colours not yet on disk (G-3); live Then is behind a precondition that fails at baseline | DATA-5 | populate the `acrylicPublished` fixture with the shipped acrylic table + published colours (`isReal=true`); the existing Then (ΔE00 ≤ 0.5 for every paint) then runs — no test rewrite | ⬜ Open |
 | TestAC09 | MPI oil data + fit API not yet on disk (G-4/G-5); **precondition-only at baseline** — graded *B pending DATA-6* | DATA-6 | **ADD the executable Then** (not merely flip `isReal`): per-λ NNLS fit on the train split, predict held-out mixtures ΔE00 ≤ 5 each, assert every fit coeff ≥ 0 at every λ, assert the train/held-out split is disjoint | ⬜ Open |
-| TestAC11 | Golden/RIT attribution wording pending the permission text (G-3) | DATA-7 | assert the finalized Golden/RIT NOTICE block | ⬜ Open |
-| TestAC12 | measured mixtures not yet on disk (G-3/G-4); asserts forward on synthetic mixtures | FORWARD-3 | switch to measured mixtures; ΔE00 ≤ 5 | ⬜ Open |
+| TestAC11 | Golden/RIT attribution wording pending the permission text (G-3); real-source provenance Then (measured→Calculated) behind the `isReal` precondition | DATA-7 | finalize + assert the agreed Golden/RIT NOTICE wording (tighten "states changes" to the exact text); flip `acrylicPublishedPlaceholder.isReal`; tag the real acrylic paints `Provenance.calculated` | ⬜ Open |
+| TestAC12 | measured mixtures not yet on disk (G-3/G-4); `measuredMixturesPlaceholder` is a placeholder — precondition-gated at baseline | FORWARD-3 | populate `measuredMixturesPlaceholder` (isReal=true, ≥1 real multi-paint mixture + published colour); the written ΔE00 ≤ 5 loop then runs — no test rewrite | ⬜ Open |
+| TestAC15 | prefer-fewer-on-tie reject needs an equal-ΔE00 2-vs-3-paint tie only the built solver can produce; at baseline the in-test tie loop fires only on a natural tie | SOLVER-3 | add a constructed guaranteed equal-ΔE00 2-vs-3-paint tie asserting the 2-paint recipe ranks first | ⬜ Open |
 | TestAC21 | real curated palette needs the acrylic data (G-3); asserts the neon-impossible property on the synthetic palette | TUNE-3 | switch to the shipped Zorn-style acrylic palette | ⬜ Open |

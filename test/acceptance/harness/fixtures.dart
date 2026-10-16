@@ -73,6 +73,24 @@ final OilMixtures oilMixturesPlaceholder = (
   isReal: false,
 );
 
+/// `measuredMixtures` (AC-12) — measured-paint mixtures at known volume
+/// fractions, each with the dataset's published measured colour. Placeholder
+/// until G-3/G-4/FORWARD-3: [isReal] is false and [mixtures] is null, so the
+/// forward-fidelity AC asserts its precondition (naming FORWARD-3) and the
+/// ΔE00 ≤ 5 loop runs once FORWARD-3 populates the real measured mixtures.
+typedef MeasuredMixture = ({Map<String, double> parts, ColourValue colour});
+typedef MeasuredMixtures = ({
+  PigmentTable table,
+  List<MeasuredMixture>? mixtures,
+  bool isReal,
+});
+
+final MeasuredMixtures measuredMixturesPlaceholder = (
+  table: PigmentTable.load(Medium.acrylic),
+  mixtures: null,
+  isReal: false,
+);
+
 /// `illuminants` (AC-27, @stretch) — two relative-power SPDs on the canonical
 /// grid. Placeholder until STRETCH/G-7: Planckian stand-ins ([warm] ≈ 2856 K,
 /// Illuminant-A-like; [d65] ≈ 6500 K daylight CCT), computed from Planck's law

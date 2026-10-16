@@ -12,6 +12,59 @@ import 'package:pigment_km/pigment_km.dart';
 /// The CIE D65 2° reference white (normalized Y = 1).
 const Xyz _d65White = (x: 0.95047, y: 1.0, z: 1.08883);
 
+/// The sRGB inverse electro-optical transfer function: one gamma-encoded
+/// channel (0..1) to its linear-light value.
+double _srgbToLinear(double c) =>
+    c <= 0.04045 ? c / 12.92 : math.pow((c + 0.055) / 1.055, 2.4).toDouble();
+
+/// CIE XYZ (D65, Y normalized to 1) of an sRGB colour — the independent
+/// reference used to build acceptance targets and to check the engine's own
+/// colour pipeline (AC-13/15/16/17). The standard linear-sRGB→XYZ D65 matrix.
+Xyz srgbToXyz(Srgb c) {
+  final r = _srgbToLinear(c.r);
+  final g = _srgbToLinear(c.g);
+  final b = _srgbToLinear(c.b);
+  return (
+    x: 0.4123907993 * r + 0.3575843394 * g + 0.1804807884 * b,
+    y: 0.2126390059 * r + 0.7151686788 * g + 0.0721923154 * b,
+    z: 0.0193308187 * r + 0.1191947798 * g + 0.9505321522 * b,
+  );
+}
+
+/// OKLCh (Ottosson OKLab → polar) of an sRGB colour — the independent reference
+/// for chroma/hue assertions (AC-13 desaturation) and target construction.
+Oklch srgbToOklch(Srgb c) {
+  final r = _srgbToLinear(c.r);
+  final g = _srgbToLinear(c.g);
+  final b = _srgbToLinear(c.b);
+  final l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+  final m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+  final s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+  final lc = math.pow(l, 1.0 / 3.0).toDouble();
+  final mc = math.pow(m, 1.0 / 3.0).toDouble();
+  final sc = math.pow(s, 1.0 / 3.0).toDouble();
+  final okL = 0.2104542553 * lc + 0.7936177850 * mc - 0.0040720468 * sc;
+  final okA = 1.9779984951 * lc - 2.4285922050 * mc + 0.4505937099 * sc;
+  final okB = 0.0259040371 * lc + 0.7827717662 * mc - 0.8086757660 * sc;
+  final chroma = math.sqrt(okA * okA + okB * okB);
+  var hue = math.atan2(okB, okA) * 180.0 / math.pi;
+  if (hue < 0) hue += 360;
+  return (l: okL, c: chroma, h: hue);
+}
+
+/// Builds a consistent [ColourValue] (sRGB, XYZ, OKLCh of the same colour) from
+/// an sRGB triple via the independent reference, so acceptance targets carry all
+/// three representations the way the engine's own output does.
+ColourValue colourFromSrgb(Srgb srgb) =>
+    ColourValue(srgb: srgb, xyz: srgbToXyz(srgb), oklch: srgbToOklch(srgb));
+
+/// The absolute circular hue difference in degrees (0..180).
+double hueDiffDeg(double a, double b) {
+  var d = (a - b).abs() % 360;
+  if (d > 180) d = 360 - d;
+  return d;
+}
+
 /// CIELAB L*a*b* of an XYZ tristimulus value under D65.
 ({double l, double a, double b}) xyzToLab(Xyz xyz) {
   double f(double t) {

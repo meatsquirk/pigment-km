@@ -12,6 +12,7 @@ library;
 export 'src/colour/gamut_map.dart';
 export 'src/colour/spectrum_to_colour.dart';
 export 'src/data/artifact_format.dart';
+export 'src/data/masstone_tint.dart';
 export 'src/data/pigment_table.dart';
 export 'src/data/resample.dart';
 export 'src/engine/custom_km_engine.dart';
