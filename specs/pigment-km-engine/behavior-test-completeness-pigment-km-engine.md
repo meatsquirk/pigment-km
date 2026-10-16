@@ -75,3 +75,16 @@ the public `Pigment(...)` constructor, `MixOptions`, `configForMedium`,
 - **AC-21 (TUNE-3):** confirm/tune the real naturalistic chroma ceiling (harden), don't merely swap in the shipped palette.
 - **AC-22 (TUNE-2):** construct the guaranteed equal-ΔE00 2-vs-3-paint tie the test depends on, together with the un-pend (until then the test is over-constrained on `sawTie`).
 - **AC-23 (TUNE-4 / G-2):** resolve the forward-vs-inverse wet/dry interface so the best recipe is stable across wet/dry states.
+
+## Behaviour re-grade — KM-2 (un-pended AC-1, AC-3) · graded 2026-10-16
+
+Grader: fresh independent general-purpose subagent, adversarial, G1–G6; given the
+Band 1 grid and asked to justify any downgrade against a named rule. The behaviour
+grade gate re-grades **every un-pended AC test** now that KM-2's `kmReflectance`/
+`kmFunction` run against real code. Result: **2 A** (no downgrade from Band 1); fix
+passes 0/3.
+
+| AC | Test | Grade | Notes |
+|---|---|---|---|
+| AC-1 | TestAC01_SpectrumToColour | A (re-confirmed) | Code unchanged since COLOR-2. Given checked through the public surface (spectrum length 31, published XYZ = D65 white, published sRGB = white); When runs real `spectrumToColour`; Then ΔE00 ≤ 1 vs the independent CIEDE2000 yardstick + Y≈1 + sRGB white. Rejects a backend that drops `yBarD65Sum` normalization or mis-weights the illuminant. Same unchanged G5-floor flag (single white fixture; a non-white published target hardens it post DATA-5). |
+| AC-3 | TestAC03_KmRoundTrip | A | Now live against the real KM physics. Given checked through the public surface (`koverS` from `synthPigments()`, each bin finite and > 0) before the When; When runs the real barrel `kmReflectance` → `kmFunction`. Three independent Thens pin the physics: (1) reflectance ∈ [0,1] at every bin — **rejects the wrong (+√) root** (R>1 for x>0; the round-trip alone cannot, since the two roots are reciprocals and f(R)=f(1/R)); (2) K/S=0 → R=1 (1e-5) known reference point; (3) `kmFunction∘kmReflectance` round-trips to 1e-5 — rejects a dropped constant in f(R) (e.g. missing the 2× doubles K/S). Prior "fixed in-phase (was B/G5)" note confirmed holding green against real code. |

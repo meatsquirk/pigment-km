@@ -10,6 +10,7 @@ import 'harness/harness.dart';
 /// AC to the phase that delivered it, mirroring [pendingACs]'s AC→phase shape.
 const Map<String, String> unpendedACs = <String, String>{
   'AC-1': 'COLOR-2',
+  'AC-3': 'KM-2',
 };
 
 /// Guards the pending gate itself (never pending). The assertions pin the full

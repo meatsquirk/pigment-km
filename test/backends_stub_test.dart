@@ -31,12 +31,8 @@ void main() {
   });
 
   group('KM physics stubs throw their documented UnimplementedError', () {
-    test('kmReflectance — KM-2', () {
-      expect(() => kmReflectance(spectrum), throwsUnimplementedError);
-    });
-    test('kmFunction — KM-2', () {
-      expect(() => kmFunction(spectrum), throwsUnimplementedError);
-    });
+    // kmReflectance/kmFunction are implemented in KM-2 (see test/km_test.dart);
+    // only the Saunderson stubs remain until KM-3.
     test('configForMedium — KM-3', () {
       expect(() => configForMedium(Medium.acrylic), throwsUnimplementedError);
     });
