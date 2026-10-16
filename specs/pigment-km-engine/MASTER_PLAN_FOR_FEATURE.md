@@ -1,7 +1,7 @@
 # Master Plan — pigment_km: measured-pigment Kubelka–Munk mixing engine
 
 **Spec:** [pigment-km-engine.feature](../pigment-km-engine.feature)
-**Status:** In progress — ITEST-3 done (AC-10..18 pending + red baseline, 9 A incl. 2 data-limited); next ITEST-4
+**Status:** In progress — ITEST-4 done (AC-19..27 pending + red baseline, 6 A / 1 A-data-limited / 2 B-pending behind G-7); acceptance stage complete, next ITEST-5 test review → G-2
 **Architecture:** [Nuance/docs/custom-mixing-engine-design.md](../../../Nuance/docs/custom-mixing-engine-design.md) (physics §3, datasets §4, forward/inverse §6, tuning §7, staged plan §8, licensing §13) · [Nuance/docs/paint-color-app-solution-intent.md](../../../Nuance/docs/paint-color-app-solution-intent.md) (D3/D6/D7/D9, accuracy NFRs) · consumption contract: `Nuance/lib/recipes/engine/mixing_engine.dart` (bs-04)
 **Code home:** `/Users/matthew.quirk/pigment_km` · remote `https://github.com/meatsquirk/pigment-km` (origin, pushed) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
 
@@ -221,8 +221,8 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 | 4 | ITEST-1 | acceptance-tests: harness, fixtures, pending gate (all 27), smoke | ✅ Done | 5.53M | 12m 21s | harness+6 fixtures+pending gate (27 ACs, bijection-pinned)+smoke; analyze clean, acceptance 7/7 default==run-pending, grades 5 A/0 |
 | 5 | ITEST-2 | acceptance-tests: AC-1..9 (pending) + red baseline | ✅ Done | 10.94M | 30m 21s | 8 A / 1 B-pending-DATA-6; red baseline +1/−8 (AC-6 green); Option-A backend stubs added |
 | 6 | ITEST-3 | acceptance-tests: AC-10..18 (pending) + red baseline | ✅ Done | 10.79M | 22m 28s | 9 A (AC-11/12 data-limited); red baseline −9 each naming its owner; Option-A DATA-4 stub added |
-| 7 | ITEST-4 | acceptance-tests: AC-19..27 (pending) + red baseline | ⬜ Next | | | tag AC-26/27 @stretch |
-| 8 | ITEST-5 | test-review: packet; G-2 | ⬜ Todo | | | |
+| 7 | ITEST-4 | acceptance-tests: AC-19..27 (pending) + red baseline | ✅ Done | 6.34M | 16m 10s | 6 A / 1 A-data-limited (AC-21) / 2 B-pending (AC-26/27, G-7); red baseline −9 each for the right reason; no Option-A stubs; `@stretch` tagged |
+| 8 | ITEST-5 | test-review: packet; G-2 | ⬜ Next | | | preconditions met (all AC-test phases done, grid all A or B-pending w/ augmentation) |
 | 9 | COLOR-2 | AC-1 spectrum→colour | ⬜ Todo | | | ∥ KM-2, DATA-2 |
 | 10 | COLOR-3 | AC-2 gamut map | ⬜ Todo | | | |
 | 11 | KM-2 | AC-3 KM round-trip | ⬜ Todo | | | ∥ COLOR-2, DATA-2 |
@@ -256,10 +256,10 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 
 ## Next phase
 
-ITEST-3 is done: AC-10..18 pending tests in `test/acceptance/ac10_18_test.dart`, all through the public surface; 9 A (AC-11, AC-12 data-limited; AC-15 fixed B→A in-phase). Red baseline −9/+0, each failing for the right reason (AC-10/13/14 on their When, AC-15..18 on `inverse`, AC-11/12 on a Given precondition naming DATA-7/FORWARD-3). Per the ITEST-2 **Option A** precedent, added the public stub `deriveKsFromMasstoneTint` (DATA-4) + `Tint` typedef, the `measuredMixturesPlaceholder` fixture (AC-12), and independent `srgbToXyz`/`srgbToOklch`/`colourFromSrgb` reference maths to the harness.
-**ITEST-4** is next (last AC-test band, AC-19..27; tag AC-26/27 `@stretch`) — startable now; disjoint from ITEST-3's files. Same recipe: `import 'harness/harness.dart'`, `skip: ac('AC-n')` per `test(...)`, run-pending for the red baseline, grade with a fresh subagent. Then **ITEST-5** (test review → **G-2**) gates the whole behaviour stage.
-Flags for the G-2 review / behaviour planning: (1) **AC-5** owned by KM-4 but its colour Then needs `forward` (FORWARD-2) — move its un-pend or add a public K,S-mixing surface; (2) **AC-6** green at baseline (shell loader) — kept pending→DATA-3, reviewer may un-pend now; (3) backend stub signatures frozen by ITEST-2/3 (now incl. `deriveKsFromMasstoneTint` — change only with a recorded reason); (4) **AC-15** prefer-fewer-on-tie reject is augmentation-tracked (SOLVER-3 must add a constructed equal-ΔE00 2-vs-3-paint tie); (5) **AC-17** in-gamut target is assumed reachable (SOLVER-6 confirms; G-6 adds validation evidence).
-Dataset gates still open (block only fidelity/real-palette ACs): G-3/G-4/G-5. All behaviour up to those ACs uses the synthetic fixture (D-7). Smoke note for FORWARD-3: strengthen the smoke's `forward` case to synthetic-white→near-white once the forward model lands. Recommended order once ITEST-5 approved: acrylic critical path (COLOR→KM→DATA→FORWARD) to the ΔE00 gate, then SOLVER, TUNE, PROD; STRETCH only if G-7 says so.
+ITEST-4 is done: AC-19..27 pending tests in `test/acceptance/ac19_27_test.dart` (+ `dart_test.yaml` declaring the `stretch` tag), all through the already-frozen public surface — **no Option-A stubs needed**. Grades 6 A / 1 A-data-limited (AC-21) / 2 B-pending behind G-7 (AC-26 glazing, AC-27 metamerism). Red baseline −9/+0, each for the right reason (AC-19/20/22/23/24/25 on `inverse`, AC-21 on `forward`, AC-26/27 on a G-7 scope precondition). The acceptance stage (ITEST-1..4) is now complete.
+**ITEST-5** is next — the **test review** (kind `test-review`): assemble the packet in `modules/ITEST.md` (per AC one-liners, red-baseline summary, augmentations + closing phase, grid path/counts, what to look at first), set the phase `⏸ Awaiting review` and **G-2** *awaiting decision*, then stop with `/feature-next-phase --gate pigment-km-engine G-2 approved | "<changes>"`. Preconditions are met.
+Flags for the G-2 review / behaviour planning: (1) **AC-5** owned by KM-4 but its colour Then needs `forward` (FORWARD-2) — move its un-pend or add a public K,S-mixing surface; (2) **AC-6** green at baseline (shell loader) — kept pending→DATA-3, reviewer may un-pend now; (3) backend stub signatures frozen by ITEST-2/3 (incl. `deriveKsFromMasstoneTint` — change only with a recorded reason); (4) **AC-15** prefer-fewer-on-tie reject augmentation-tracked (SOLVER-3 constructs the tie); (5) **AC-17** in-gamut target assumed reachable (SOLVER-6 confirms; G-6 validation); (6) **AC-21** (TUNE-3) trusts a provisional in-test chroma ceiling on the synthetic palette — TUNE-3 must confirm the *real* ceiling, not just swap data; (7) **AC-22** (TUNE-2) must construct the equal-ΔE00 tie it depends on, with the un-pend; (8) **AC-23** (TUNE-4) exercises wet/dry via `inverse(MixOptions.wet)` because `forward()` takes no options — **G-2 should resolve** whether wet/dry is a post-prediction state transform or `forward` gains an options param; (9) **AC-26/27** scope-gated behind **G-7** — placeholder scope preconditions; STRETCH-2/3 freeze the glazing/metamerism API and build the real Thens only if G-7 approves scope.
+Dataset gates still open (block only fidelity/real-palette ACs): G-3/G-4/G-5; S6 scope gate G-7. All behaviour up to those ACs uses the synthetic fixture (D-7). Smoke note for FORWARD-3: strengthen the smoke's `forward` case to synthetic-white→near-white once the forward model lands. Recommended order once ITEST-5 approved: acrylic critical path (COLOR→KM→DATA→FORWARD) to the ΔE00 gate, then SOLVER, TUNE, PROD; STRETCH only if G-7 says so.
 
 ## Token usage
 
@@ -275,7 +275,8 @@ Dataset gates still open (block only fidelity/real-palette ACs): G-3/G-4/G-5. Al
 | ITEST-1 | f47243c8 | 2026-10-16 07:35 EDT | 07:47 | 12m 21s | 12m 21s | claude-opus-4-8 | 94 | 174,792 | 5,309,659 | 47,833 | 5,532,378 | harness + fixtures + pending gate (27 ACs) + smoke; analyze clean, acceptance 7/7 default==run-pending, grades 5 A/0 |
 | ITEST-2 | 8a7179c9 | 2026-10-16 08:01 EDT | 08:32 | 30m 59s | 30m 21s | claude-opus-4-8 | 144 | 286,271 | 10,546,135 | 111,313 | 10,943,863 | AC-1..9 pending + red baseline; 8 A / 1 B-pending-DATA-6; Option-A backend stubs; harness skip bug fixed |
 | ITEST-3 | 70fbb425 | 2026-10-16 08:35 EDT | 08:58 | 22m 28s | 22m 28s | claude-opus-4-8 | 152 | 273,308 | 10,438,132 | 80,246 | 10,791,838 | AC-10..18 pending + red baseline; 9 A (AC-11/12 data-limited, AC-15 fixed B→A); Option-A DATA-4 stub; analyze clean, default 70/18, coverage PASS |
-| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-16 08:58** | **2h 14m** | **1h 45m** |  | **700** | **1,167,456** | **41,162,389** | **414,760** | **42,745,305** |  |
+| ITEST-4 | 0f8bbd98 | 2026-10-16 09:10 EDT | 09:27 | 16m 10s | 16m 10s | claude-opus-4-8 | 108 | 202,680 | 6,082,471 | 57,386 | 6,342,645 | AC-19..27 pending + red baseline (−9 each right reason); grades 6 A / 1 A-data-limited / 2 B-pending (G-7); no Option-A stubs; @stretch tagged |
+| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-16 09:27** | **2h 31m** | **2h 01m** |  | **808** | **1,370,136** | **47,244,860** | **472,146** | **49,087,950** |  |
 
 ## Sign-off
 

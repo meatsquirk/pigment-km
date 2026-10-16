@@ -1,6 +1,6 @@
 # Module ITEST — acceptance integration suite
 
-**Status:** 🔄 In progress (ITEST-1 ✅)
+**Status:** 🔄 In progress (ITEST-1..4 ✅; next ITEST-5 test review → G-2)
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `test/acceptance/*` (harness, fixtures, pending gate, one test per AC), `test/acceptance/fixtures/*`
 **Depends on:** CORE-2, DATA-1 (shells) · **Blocks:** every behavior phase (via G-2)
@@ -12,7 +12,7 @@
 | 1 (ITEST-1) | acceptance-tests | — (harness) | ✅ Done | 5.53M | 12m 21s |
 | 2 (ITEST-2) | acceptance-tests | AC-1..9 | ✅ Done | 10.94M | 30m 21s |
 | 3 (ITEST-3) | acceptance-tests | AC-10..18 | ✅ Done | 10.79M | 22m 28s |
-| 4 (ITEST-4) | acceptance-tests | AC-19..27 | ⬜ Todo | | |
+| 4 (ITEST-4) | acceptance-tests | AC-19..27 | ✅ Done | 6.34M | 16m 10s |
 | 5 (ITEST-5) | test-review | — | ⬜ Todo | | |
 
 ## Interface reconciliation
@@ -107,7 +107,26 @@
 - **Kind:** acceptance-tests · **Target AC:** AC-19..AC-27 · **Depends on:** ITEST-1 · **Blocks:** ITEST-5 · ∥ ITEST-2/3
 - **Tasks/Exit:** as ITEST-2 for `TestAC19..TestAC27`; tag AC-26/27 `@stretch`.
 
-### Result · Checkpoint  <!-- filled on completion -->
+### Result · Checkpoint
+
+**Result.** The AC-19..AC-27 pending acceptance tests (`test/acceptance/ac19_27_test.dart`), the last AC-test band, each through the public surface, each gated by `skip: ac('AC-n')`. No `lib/` touched — this phase adds only test files + a tag declaration.
+
+- **No Option-A stubs needed:** every AC-19..25 scenario drives the already-frozen public surface (`inverse`, `forward`, `configForMedium`, the `MixingEngine` interface, `Recipe`/`MixOptions`/`Provenance`/`WetDryTransform`, the public `Pigment` constructor). The two @stretch ACs (AC-26/27) are deliberately NOT given a frozen glazing/metamerism API — their scope is gated behind the still-open **G-7**; each body asserts a scope precondition (`_stretchScopeApproved` const `false`) naming G-7, with the full Given/When/Then/Rejects documented in-place for STRETCH-2/3 to implement once scope is approved.
+- **`@stretch` tagging:** AC-26/27 carry `tags: 'stretch'`; new `dart_test.yaml` declares the tag so `dart test -x stretch` excludes them warning-free (verified −7 excluded).
+- **Verification (green):** `export PATH="$HOME/development/flutter/bin:$PATH"` first. `dart analyze test/acceptance/ac19_27_test.dart` → No issues · default `dart test test/acceptance` → **7 passed / 27 skipped** (all 27 ACs now pending-skipped) · full `dart test` → **70 passed / 27 skipped** · coverage gate **N/A** (no `lib/` source touched — test-only change, as ITEST-1).
+- **Red baseline** (`PIGMENT_KM_RUN_PENDING=true dart test test/acceptance/ac19_27_test.dart`): **−9 / +0** — every test fails for the right reason (per-AC rows in the *Red baseline* table). AC-19/22/23/24/25 on the `inverse` When, AC-20 on `inverse`, AC-21 on the `forward` When, AC-26/27 on a Given scope precondition naming G-7.
+- **Grades:** fresh independent subagent (G1–G6 + catalogue, matched to Band 1/2) → **6 A, 1 A (data-limited: AC-21), 2 B pending (AC-26→STRETCH-2, AC-27→STRETCH-3)** — no G-rule failures; all downgrades are the rubric's sanctioned gate/data deferrals. Grid: `behavior-test-completeness-pigment-km-engine.md` Band 3. Augmentation rows added for AC-21/22/26/27.
+- **Fix passes:** 0/3 (passed first run; the two Bs are the sanctioned *B pending <phase>* exception behind open G-7, not in-phase-fixable).
+
+**Checkpoint / Handoff.**
+- **Frozen for the behaviour phases (un-pend = delete the AC's row in `pending.dart`):** SOLVER-5 (AC-19), SOLVER-7 (AC-20), TUNE-3 (AC-21), TUNE-2 (AC-22), TUNE-4 (AC-23), PROD-2 (AC-24), PROD-3 (AC-25); STRETCH-2 (AC-26) / STRETCH-3 (AC-27) only after G-7.
+- **Carry-forward flags for owning phases (from the grader):**
+  - ⚠ **AC-19 (SOLVER-5):** add a constructed cross-medium-tempting target as a control (the test uses a generic grey target; the catalogue's explicit control isn't built).
+  - ⚠ **AC-21 (TUNE-3):** confirm/tune the *real* naturalistic chroma ceiling — the test trusts a provisional in-test ceiling (0.25) on the synthetic palette and does **not** gate behind an `isReal` precondition; TUNE-3 must ship the curated palette **and** harden the ceiling.
+  - ⚠ **AC-22 (TUNE-2):** construct the guaranteed equal-ΔE00 2-vs-3-paint tie the test's `expect(sawTie, isTrue)` depends on, **together with** the un-pend — until then the test is over-constrained on an absent natural tie (same AC-15/SOLVER-3 treatment).
+  - ⚠ **AC-23 (TUNE-4 / G-2):** resolve the forward-vs-inverse wet/dry interface — `forward()` takes no options, so the test reads wet/dry via `inverse(MixOptions.wet)`+`Recipe.colour` and asserts parts unchanged; TUNE-4/the interface must make wet/dry a post-prediction state transform (or add `forward(mix, opts)`) so the best recipe is stable across states.
+- **Verification (reuse):** `dart analyze` · `dart test` · acceptance default/red-baseline as above · `dart test -x stretch` excludes AC-26/27.
+- **Next:** **ITEST-5** — the test review (assemble the packet, set `⏸ Awaiting review`, G-2 *awaiting decision*). Preconditions now met: all three AC-test phases done; whole-suite grid all A or *B pending <phase>* with an augmentation row. G-2 gates the whole behaviour stage.
 
 ## Phase 5 — ITEST-5: test review (G-2)
 
@@ -139,7 +158,15 @@
 | AC-16 | TestAC16_PaletteOnly | fail | When — `UnimplementedError: CustomKmEngine.inverse — SOLVER phases` | SOLVER-2 | A |
 | AC-17 | TestAC17_InGamut | fail | When — `UnimplementedError: CustomKmEngine.inverse — SOLVER phases` | SOLVER-6 | A |
 | AC-18 | TestAC18_OutOfGamut | fail | When — `UnimplementedError: CustomKmEngine.inverse — SOLVER phases` | SOLVER-4 | A |
-| … | (AC-19..27 filled ITEST-4) | | | | |
+| AC-19 | TestAC19_CrossMedium | fail | When — `UnimplementedError: CustomKmEngine.inverse — SOLVER phases` | SOLVER-5 | A |
+| AC-20 | TestAC20_Performance | fail | When — `UnimplementedError: CustomKmEngine.inverse — SOLVER phases` | SOLVER-7 | A |
+| AC-21 | TestAC21_NoNeon | fail | When — `UnimplementedError: CustomKmEngine.forward — FORWARD phases` | TUNE-3 | A (data-limited) |
+| AC-22 | TestAC22_ChromaPenalty | fail | When — `UnimplementedError: CustomKmEngine.inverse — SOLVER phases` | TUNE-2 | A |
+| AC-23 | TestAC23_WetDry | fail | When — `UnimplementedError: CustomKmEngine.inverse — SOLVER phases` | TUNE-4 | A |
+| AC-24 | TestAC24_Provenance | fail | When — `UnimplementedError: CustomKmEngine.inverse — SOLVER phases` | PROD-2 | A |
+| AC-25 | TestAC25_ABEngines | fail | When — `UnimplementedError: CustomKmEngine.inverse — SOLVER phases` | PROD-3 | A |
+| AC-26 | TestAC26_Glazing (@stretch) | fail | Given precondition — S6 glazing scope gated behind G-7 (`_stretchScopeApproved` false) | STRETCH-2 | B pending STRETCH-2 |
+| AC-27 | TestAC27_Metamerism (@stretch) | fail | Given precondition — S6 metamerism scope gated behind G-7 (`_stretchScopeApproved` false) | STRETCH-3 | B pending STRETCH-3 |
 
 ## Test augmentations  <!-- pre-seeded; confirmed by AC-test phases; closed by behavior phases -->
 
@@ -150,4 +177,7 @@
 | TestAC11 | Golden/RIT attribution wording pending the permission text (G-3); real-source provenance Then (measured→Calculated) behind the `isReal` precondition | DATA-7 | finalize + assert the agreed Golden/RIT NOTICE wording (tighten "states changes" to the exact text); flip `acrylicPublishedPlaceholder.isReal`; tag the real acrylic paints `Provenance.calculated` | ⬜ Open |
 | TestAC12 | measured mixtures not yet on disk (G-3/G-4); `measuredMixturesPlaceholder` is a placeholder — precondition-gated at baseline | FORWARD-3 | populate `measuredMixturesPlaceholder` (isReal=true, ≥1 real multi-paint mixture + published colour); the written ΔE00 ≤ 5 loop then runs — no test rewrite | ⬜ Open |
 | TestAC15 | prefer-fewer-on-tie reject needs an equal-ΔE00 2-vs-3-paint tie only the built solver can produce; at baseline the in-test tie loop fires only on a natural tie | SOLVER-3 | add a constructed guaranteed equal-ΔE00 2-vs-3-paint tie asserting the 2-paint recipe ranks first | ⬜ Open |
-| TestAC21 | real curated palette needs the acrylic data (G-3); asserts the neon-impossible property on the synthetic palette | TUNE-3 | switch to the shipped Zorn-style acrylic palette | ⬜ Open |
+| TestAC21 | real curated palette needs the acrylic data (G-3); asserts the neon-impossible property on the synthetic palette against a provisional in-test chroma ceiling (0.25), not gated behind an `isReal` precondition | TUNE-3 | switch to the shipped Zorn-style acrylic palette **and** confirm/tune the real naturalistic chroma ceiling (harden the bound, not merely swap data) | ⬜ Open |
+| TestAC22 | the chroma-penalty tie-break only fires on an equal-ΔE00 differing-chroma pair the synthetic solve won't deterministically produce; `expect(sawTie, isTrue)` requires one | TUNE-2 | construct a guaranteed equal-ΔE00 2-vs-3-paint tie (differing chroma) asserting the lower-chroma recipe ranks first, built together with the un-pend | ⬜ Open |
+| TestAC26 (@stretch) | finite-thickness glazing is an optional S6 scenario gated behind the open G-7; its layering API is deliberately not frozen before scope approval — body asserts the G-7 scope precondition only | STRETCH-2 | once G-7 approves, freeze the layering API and replace the placeholder body with the documented Given/When/Then (incl. X→∞ → opaque-form control) | ⬜ Open (G-7) |
+| TestAC27 (@stretch) | metamerism index is an optional S6 scenario gated behind the open G-7; its multi-illuminant API is deliberately not frozen before scope approval — body asserts the G-7 scope precondition only (the `illuminants` d65+warm fixture is staged) | STRETCH-3 | once G-7 approves, freeze the metamerism-index API and replace the placeholder body with the documented Given/When/Then (incl. the single-illuminant reject) | ⬜ Open (G-7) |

@@ -1,0 +1,8 @@
+# Test tag declarations for the pigment_km suite.
+#
+# `stretch` marks the optional S6 acceptance scenarios (AC-26 glazing, AC-27
+# metamerism). They are gated behind the open G-7 scope decision, so the normal
+# runs exclude them with `dart test -x stretch`; declaring the tag here keeps
+# that selector warning-free.
+tags:
+  stretch:
