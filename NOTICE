@@ -1,0 +1,52 @@
+pigment_km
+Copyright (c) 2026 Matt Quirk
+
+This product's SOURCE CODE is licensed under the MIT License (see LICENSE).
+
+It incorporates, or is designed to incorporate, third-party research and measured
+pigment data that are NOT covered by the MIT License and retain their own terms:
+
+--------------------------------------------------------------------------------
+1. Spectral.js — Ronald van Wijnen
+   License: MIT
+   https://github.com/rvanwijnen/spectral.js
+   Use: the spectrum->XYZ->sRGB conversion and OKLCh gamut mapping are derived
+   from Spectral.js.
+
+2. LHTSS reflectance reconstruction — Scott Burns
+   http://scottburns.us/
+   Use: the RGB->spectrum method underlying the colour backend.
+
+--------------------------------------------------------------------------------
+3. RIT Artist Paint Spectral Database (Golden Heavy Body acrylics)
+   Okumura (2005); Berns (2022).
+   Munsell Color Science Laboratory, Rochester Institute of Technology.
+
+   Absorption (K) and scattering (S) spectra for Golden Heavy Body acrylics are
+   derived from this database and are included WITH THE PERMISSION of
+   Prof. Roy S. Berns (RIT MCSL), granted in 2026 for inclusion in this
+   open-source library and the application built on it, with attribution.
+
+   This data is NOT licensed under MIT and remains the work of RIT/MCSL. Anyone
+   wishing to reuse the RIT-derived data should obtain their own permission from
+   RIT / the Munsell Color Science Laboratory.
+
+   Cite:
+     Okumura, Y. (2005). Developing a spectral and colorimetric database of
+       artist paint materials. M.S. thesis, Rochester Institute of Technology,
+       Munsell Color Science Laboratory.
+     Berns, R. S. (2022). An Artist Acrylic Paint Spectral, Colorimetric, and
+       Image Dataset. IS&T Archiving Conference.
+   Methodology: https://artistpigments.org/methodology
+
+--------------------------------------------------------------------------------
+4. MPI multispectral oil & watercolor paint dataset  (planned)
+   License: CC BY 4.0  (https://creativecommons.org/licenses/by/4.0/)
+
+   Oil-paint optical data derived from:
+     Azadeh Asadi Shahmirzadi, Vahid Babaei, and Hans-Peter Seidel,
+     "A Multispectral Dataset of Oil and Watercolor Paints,"
+     IS&T Electronic Imaging, Material Appearance, 2020.
+   Changes: spectral reflectances resampled to this library's canonical
+   wavelength grid and used to derive two-constant Kubelka-Munk K/S coefficients.
+--------------------------------------------------------------------------------

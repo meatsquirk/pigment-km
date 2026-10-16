@@ -3,7 +3,7 @@
 **Spec:** [pigment-km-engine.feature](../pigment-km-engine.feature)
 **Status:** Not started — next CORE-1 (blocked by G-1: approve the spec)
 **Architecture:** [Nuance/docs/custom-mixing-engine-design.md](../../../Nuance/docs/custom-mixing-engine-design.md) (physics §3, datasets §4, forward/inverse §6, tuning §7, staged plan §8, licensing §13) · [Nuance/docs/paint-color-app-solution-intent.md](../../../Nuance/docs/paint-color-app-solution-intent.md) (D3/D6/D7/D9, accuracy NFRs) · consumption contract: `Nuance/lib/recipes/engine/mixing_engine.dart` (bs-04)
-**Code home:** `/Users/matthew.quirk/pigment_km` · remote **TBD — create at CORE-1** (user to provide GitHub URL) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
+**Code home:** `/Users/matthew.quirk/pigment_km` · remote `https://github.com/meatsquirk/pigment-km` (origin, pushed) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
 
 Standalone open-source Dart package, MIT-licensed with attribution to the source research (design §13). The Nuance app consumes it later behind its existing `MixingEngine` interface via a thin adapter (Nuance's work, out of this package's scope). Scope: the whole S0–S6 engine program (owner chose "whole program" 2026-10-15). Acrylic (Golden/RIT) is brought up end-to-end first; oil (MPI) second; STRETCH (S6) is optional behind G-7.
 
