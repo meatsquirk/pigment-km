@@ -1,6 +1,6 @@
 # Module ITEST — acceptance integration suite
 
-**Status:** 🔄 In progress (ITEST-1..4 ✅; next ITEST-5 test review → G-2)
+**Status:** 🔄 In progress (ITEST-1..4 ✅; ITEST-5 packet assembled — ⏸ awaiting G-2 decision)
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `test/acceptance/*` (harness, fixtures, pending gate, one test per AC), `test/acceptance/fixtures/*`
 **Depends on:** CORE-2, DATA-1 (shells) · **Blocks:** every behavior phase (via G-2)
@@ -13,7 +13,7 @@
 | 2 (ITEST-2) | acceptance-tests | AC-1..9 | ✅ Done | 10.94M | 30m 21s |
 | 3 (ITEST-3) | acceptance-tests | AC-10..18 | ✅ Done | 10.79M | 22m 28s |
 | 4 (ITEST-4) | acceptance-tests | AC-19..27 | ✅ Done | 6.34M | 16m 10s |
-| 5 (ITEST-5) | test-review | — | ⬜ Todo | | |
+| 5 (ITEST-5) | test-review | — | ⏸ Awaiting review | 2.27M | 5m 13s |
 
 ## Interface reconciliation
 - **Boundary:** the package's public API only (`lib/pigment_km.dart` exports) — `spectrumToColour`/gamut-map, `kmReflectance`/`kmFunction`/`saunderson`, `MixingEngine.forward`/`inverse`/`reflectanceOf`, `PigmentTable.load`, the value types. No test reaches into `lib/src` internals. Engines assembled exactly as a consumer would (the same construction the README documents) — the only non-test code this module may touch is that one shared constructor; the coverage gate applies to it.
@@ -134,7 +134,66 @@
 - **Preconditions:** every AC-test phase done; whole-suite grid all A (or *B pending <phase>*).
 - **Tasks:** assemble the packet here (per AC: test name, Given checks, When, Then + Rejects, one line each; red-baseline summary; scheduled augmentations + closing phase; grid path + counts; what to look at first — the fidelity ACs limited until G-3/G-4). Set this phase `⏸ Awaiting review`, G-2 *awaiting decision*, record ledger, commit, stop with: `/feature-next-phase --gate pigment-km-engine G-2 approved | "<changes>"`.
 
-### Result · Checkpoint  <!-- filled on completion -->
+### Result · Checkpoint
+
+**Status: ⏸ Awaiting review — G-2 awaiting decision.** The full acceptance suite (one pending integration test per AC, ITEST-2/3/4) is assembled below for a human to approve before any behaviour is coded. No `lib/` or test code changed this phase — a review-only session.
+
+**Preconditions met (verified live this session):**
+- All three AC-test phases (ITEST-2/3/4) ✅ Done; all 27 ACs have one pending test through the package's **public surface only** (no reach into `lib/src`).
+- Whole-suite grade grid: **24 A / 3 B-pending** — 20 full A, 4 A (data-limited: AC-7/11/12/21), 3 *B pending <phase>* (AC-9→DATA-6, AC-26→STRETCH-2, AC-27→STRETCH-3). Every B/data-limit is the rubric's **sanctioned gate/data deferral**, not a design miss — no G-rule failures. Grid: [`../behavior-test-completeness-pigment-km-engine.md`](../behavior-test-completeness-pigment-km-engine.md) (Bands 1/2/3, each graded by a fresh independent adversarial subagent, 2026-10-16).
+- Live re-run (`export PATH="$HOME/development/flutter/bin:$PATH"`): `dart analyze` → No issues · default `dart test` → **70 passed / 27 skipped** · default `dart test test/acceptance -x stretch` → **7 passed / 25 skipped** (all ACs pending-skipped) · red baseline `PIGMENT_KM_RUN_PENDING=true dart test test/acceptance -x stretch` → **+8 / −24** (AC-6 + the two harness guards green; 24 ACs fail for-cause) · run-pending `-t stretch` → **+0 / −2** (AC-26/27 on their G-7 scope precondition).
+
+**Red-baseline summary (run-pending):** 26 of 27 tests fail for the right reason — on a `Then`, on a `When` that throws the behaviour's documented `UnimplementedError` naming its phase, or on a `Given`/scope precondition naming its owning phase/gate. **AC-6 is green at baseline** (the DATA-1 shell loader already satisfies the artifact contract). Per-AC rows: the *Red baseline* table below.
+
+**The packet — one pending test per AC (Given → When → Then / Rejects):**
+
+| AC | Test (owner · grade) | Given → When → Then · Rejects |
+|---|---|---|
+| AC-1 | TestAC01_SpectrumToColour (COLOR-2 · A) | Given perfect-diffuser spectrum (len 31) w/ published D65-white XYZ/sRGB → When `spectrumToColour` (D65, CIE-1931) → Then ΔE00(result, published) ≤ 1 via the harness's independent CIEDE2000 + Y≈1 + sRGB white · Rejects wrong normalization / dropped illuminant weighting |
+| AC-2 | TestAC02_GamutMap (COLOR-3 · A) | Given a colour with channels outside [0,1] (asserted OOG) → When `gamutMap` → Then sRGB in [0,1] + L & hue preserved + chroma reduced + result ≠ per-channel clamp · Rejects the hard clip |
+| AC-3 | TestAC03_KmRoundTrip (KM-2 · A) | Given a finite K/S>0 vector → When `kmReflectance` then `kmFunction` → Then R∞∈[0,1] every bin (the assertion that rejects the +√ branch — roots are reciprocals so round-trip alone can't) + K/S=0→R=1 + K/S round-trips to 1e-5 · Rejects the branch-sign swap |
+| AC-4 | TestAC04_Saunderson (KM-3 · A) | Given internal R + each medium's (k1,k2), media constants asserted distinct → When internal→measured→internal (acrylic) → Then recovered R to 1e-5 + control: same input gives different measured per medium, measured≠input · Rejects no-op / one global k1,k2 |
+| AC-5 | TestAC05_TwoConstantMix (**KM-4 ⚠ colour Then needs FORWARD-2** · A) | Given two paints, Σv=1 → When `forward` mixes → Then self-mix(any ratio)=pure colour + order-independent + controls (mix≠each pure; 25/75≠75/25≠50/50) · Rejects volume-ignoring / order-dependent mix |
+| AC-6 | TestAC06_Artifact (DATA-3 · A · **green at baseline**) | Given a medium's loaded table (non-empty) → When read each paint → Then K,S len 31 + pigmentIndex + opacity∈[0,1] + provenance + sourceRef + medium tag, and `load == decode(shipped asset)` · Rejects a loader dropping K/S or leaving provenance null |
+| AC-7 | TestAC07_RoundTripFidelity (DATA-5 · A data-limited, G-3) | Given real Golden/RIT acrylic + published colours (precondition fails at baseline naming G-3/DATA-5) → When render K,S→R∞→colour → Then ΔE00(rendered, published) ≤ 0.5 every paint · Rejects wrong k1,k2/grid · augment: DATA-5 flips fixture to real data (no rewrite) |
+| AC-8 | TestAC08_Resample (DATA-2 · A) | Given a linear ramp on the native 380–730@10 grid (len 36) → When `resampleOntoCanonical` → Then len 31 on 400–700@10 + exact value at every canonical bin + endpoints · Rejects nearest-bin/index-misplaced copy |
+| AC-9 | TestAC09_OilFit (DATA-6 · **B pending DATA-6**, G-4) | Given MPI oil pure+mixtures w/ ratios & disjoint split (precondition fails at baseline naming G-4) → When per-λ NNLS on train → Then held-out ΔE00 ≤ 5 + coeffs ≥ 0 + split disjoint · Rejects negative K/S or training on held-out · augment: DATA-6 **ADDs** the whole Then (not just flip `isReal`) |
+| AC-10 | TestAC10_MasstoneTint (DATA-4 · A) | Given masstone + 3 tints built from a known (K,S) via the test's **own independent** 2-constant KM ref (tints≥2, fractions∈(0,1)) → When `deriveKsFromMasstoneTint` → Then derived K,S re-predict every tint + the masstone to 1e-3 · Rejects masstone-alone (wrong S scale) / ignoring white K_w,S_w |
+| AC-11 | TestAC11_Attribution (DATA-7 · A data-limited, G-3) | Given the built tree → When inspect → Then LICENSE=MIT + NOTICE has CC BY 4.0 + Asadi/Babaei/Seidel + "changes" + RIT + every synthetic paint `estimated`/`synthetic:`; real-source `Calculated` Then behind `isReal` precondition naming DATA-7 · Rejects missing NOTICE / unattributed data · augment: DATA-7 finalizes Golden/RIT wording + flips provenance |
+| AC-12 | TestAC12_ForwardFidelity (FORWARD-3 · A data-limited, G-3/G-4) | Given a measured mixture w/ published colour (precondition fails naming FORWARD-3), parts Σ1 → When `forward` → Then ΔE00(prediction, measured) ≤ 5 · Rejects single-constant (ignores S) · augment: FORWARD-3 populates the real measured mixtures (no rewrite) |
+| AC-13 | TestAC13_Desaturation (FORWARD-4 · A) | Given two chromatic paints of differing hue (c>0.04, Δhue>20°) → When mix equal volume, compare to naive linear-RGB midpoint → Then chroma(KM mix) < chroma(RGB blend) · Rejects an RGB-space blend (the natural-colour check) |
+| AC-14 | TestAC14_Normalize (FORWARD-2 · A) | Given parts not summing to 1 (2:1, sum≈3≠1) → When `forward` → Then equals forward of the Σ1-normalized ratio to 1e-6 + control 6:3 matches, 1:2 differs · Rejects raw (unnormalized) weights / collapse-to-constant |
+| AC-15 | TestAC15_RankedPreferFewer (SOLVER-3 · A) | Given target + palette≥2 → When `inverse` (topK=5) → Then ≤topK, ≥2 candidates, best-first by ΔE00 (non-vacuous), parts Σ1 ∈ palette; on a tie fewer-paint first · Rejects unstable/unsorted/single-recipe/dataset-leaky solver · augment: SOLVER-3 constructs a guaranteed 2-vs-3-paint tie |
+| AC-16 | TestAC16_PaletteOnly (SOLVER-2 · A) | Given reddish target + palette that excludes the red (asserted absent) → When `inverse` → Then every paint in every recipe ∈ palette · Rejects a solver reaching into the full dataset |
+| AC-17 | TestAC17_InGamut (SOLVER-6 · A, validation ↔ G-6) | Given an in-gamut target (pale cool grey) → When `inverse`, take best → Then best ΔE00 ≤ 5 (gamutThreshold) + not flagged OOG · Rejects stopping early above 5 · the honesty pair of AC-18; SOLVER-6 confirms the reachable target, G-6 adds held-out validation |
+| AC-18 | TestAC18_OutOfGamut (SOLVER-4 · A) | Given `oogColour` (pure green, c>0.2, no green primary → unreachable) → When `inverse`, take best → Then flagged `outOfGamut` + honest ΔE00 > 5, never a match · Rejects a nearest-mix returned unflagged |
+| AC-19 | TestAC19_CrossMedium (SOLVER-5 · A) | Given a palette with BOTH acrylic+oil paints (asserted present) → When `inverse` → Then every recipe is single-medium matching its declared medium · Rejects a cross-medium mix · ⚠ SOLVER-5 should add a constructed cross-medium-tempting control target |
+| AC-20 | TestAC20_Performance (SOLVER-7 · A, exclusive lane) | Given a ~15-paint single-medium palette (asserted size 15) → When `inverse` top-3, timed → Then ≤3 recipes within ≤ 2 s · Rejects an exponential search |
+| AC-21 | TestAC21_NoNeon (TUNE-3 · A data-limited, G-3) | Given the curated palette (synthetic until the real Zorn-style acrylic lands) → When predict all single+pair mixes / solve a muted & a neon target → Then no mix exceeds a provisional chroma ceiling (0.25) + muted ≤ 5 + neon flagged OOG · Rejects neon-admitting palette · augment: TUNE-3 ships the real palette **and hardens the ceiling** (not just swap data) |
+| AC-22 | TestAC22_ChromaPenalty (TUNE-2 · A) | Given plain (chromaPenalty off) ranking asserted ΔE00-monotonic → When re-rank with penalty on → Then on every ΔE00 tie with a chroma gap the lower-chroma recipe ranks first; `expect(sawTie, isTrue)` · Rejects a penalty that dominates ΔE00 or has no effect · augment: TUNE-2 constructs the guaranteed equal-ΔE00 differing-chroma tie, with the un-pend |
+| AC-23 | TestAC23_WetDry (**TUNE-4 ⚠ interface decision for G-2** · A) | Given a target solved acrylic, read wet & dry (toggle on `MixOptions.wet` — observed via `inverse` because `forward()` takes no options) → When solve wet then dry → Then parts unchanged + dry differs from wet by the documented offset (darker, hue-shifted) · Rejects no-op or re-solve-that-changes-parts |
+| AC-24 | TestAC24_Provenance (PROD-2 · A) | Given a palette tagged `Calculated` (from measured data) and a single user tube tagged `Measured` → When `inverse` each, read provenance → Then measured-data recipe=Calculated, user-tube recipe=Measured · Rejects claiming Measured from the dataset or Estimated from measured data (SI D-8) |
+| AC-25 | TestAC25_ABEngines (PROD-3 · A) | Given both engines as `MixingEngine` (asserted) → When drive each via the identical `inverse(target,palette,opts)` call on the same swatch set → Then both return recipes w/ no caller change + each reports a finite non-negative ΔE00 per swatch · Rejects a baseline wired outside the interface |
+| AC-26 @stretch | TestAC26_Glazing (STRETCH-2 · **B pending**, G-7) | **Scope-gated behind open G-7** — the finite-thickness layering API is deliberately NOT frozen; body asserts `_stretchScopeApproved` only. Documented scenario for STRETCH-2: Given a mix glazed at finite X over ground Rg → When compute layered R → Then follows §3.4, R→opaque as X→∞ · Rejects reusing the opaque form |
+| AC-27 @stretch | TestAC27_Metamerism (STRETCH-3 · **B pending**, G-7) | **Scope-gated behind open G-7** — the multi-illuminant API is NOT frozen (the `illuminants` d65+warm fixture is staged); body asserts scope only. Documented scenario for STRETCH-3: Given two recipes equal under D65 → When evaluate under D65 + warm studio → Then the degrading one gets the higher metamerism index + fragility warning · Rejects a single-illuminant index |
+
+**Scheduled augmentations** (9 — full in the *Test augmentations* table below): TestAC07→DATA-5, TestAC09→DATA-6 (ADD the Then), TestAC11→DATA-7, TestAC12→FORWARD-3, TestAC15→SOLVER-3 (constructed tie), TestAC21→TUNE-3 (real palette + harden ceiling), TestAC22→TUNE-2 (constructed tie), TestAC26→STRETCH-2, TestAC27→STRETCH-3. Each closed by its owning behaviour phase; the AC's coverage is ✅ only once its test is un-pended, green, and its augmentation row is closed.
+
+**What the reviewer should look at first:**
+1. **AC-23 wet/dry interface — the one genuine design decision for G-2.** `forward()` takes no options, so the test reads wet/dry through `inverse(MixOptions.wet)` + `Recipe.colour`. G-2 should resolve whether wet/dry stays a **post-prediction state transform** or `forward` gains an options parameter; TUNE-4 implements whichever is chosen.
+2. **AC-5 owner mismatch.** AC-5's colour-level Then goes through `CustomKmEngine.forward` (FORWARD-2), but its pending owner is KM-4. Either move AC-5's un-pend to FORWARD-2 or expose a public K,S-mixing surface for a KM-4-level assertion. Flagged, not rewired.
+3. **AC-6 is green at baseline** — kept pending→DATA-3 rather than cascade-editing the ITEST-1 bijection guard. The reviewer may un-pend it now; its asset path `assets/pigments/synthetic_<medium>.json` must survive any DATA-3/DATA-5 rename.
+4. **The 4 data-limited A's (AC-7/11/12/21)** and **3 B-pending (AC-9, AC-26, AC-27)** — confirm the gate/data deferrals are acceptable (G-3/G-4 fidelity data; G-7 stretch scope). AC-9/AC-26/AC-27 are the only three graded below A, all for an open gate, none in-phase-fixable.
+5. **Augmentation obligations that are more than data swaps:** AC-9 (DATA-6 must ADD the full held-out-fit Then), AC-15/AC-22 (constructed equal-ΔE00 ties, built *with* the un-pend), AC-21 (TUNE-3 must harden the real chroma ceiling, not just swap palette).
+6. **Backend stub signatures are frozen** by ITEST-2/3 (`spectrumToColour`, `gamutMap`, `kmReflectance`/`kmFunction`, `configForMedium`/`saundersonToMeasured`/`saundersonToInternal`, `resampleOntoCanonical`, `deriveKsFromMasstoneTint`) — behaviour phases fill the bodies; change a signature only with a recorded reason.
+
+**Decision to record** (one of):
+- `/feature-next-phase --gate pigment-km-engine G-2 approved`
+- `/feature-next-phase --gate pigment-km-engine G-2 "changes: <items>"` — each item becomes an ITEST change phase before the behaviour stage, then a fresh review.
+
+**Verification (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"` first. `dart analyze` · `dart test` · default/red-baseline acceptance as above · `dart test -x stretch` excludes AC-26/27.
+
+**Checkpoint / Handoff.** On **G-2 approved**, the behaviour stage opens: module heads **COLOR-2 ∥ KM-2 ∥ DATA-2** are startable (disjoint files); un-pend = delete the AC's row in `pending.dart`; honour every augmentation row above. On **changes requested**, each item is an ITEST change phase, then ITEST-6 re-review. No code/tests changed this session — the suite is exactly as ITEST-4 left it.
 
 ## Red baseline  <!-- filled by the AC-test phases -->
 
