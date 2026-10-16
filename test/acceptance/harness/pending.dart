@@ -21,7 +21,6 @@ const Map<String, String> pendingACs = <String, String>{
   'AC-12': 'FORWARD-3',
   'AC-13': 'FORWARD-4',
   'AC-15': 'SOLVER-3',
-  'AC-16': 'SOLVER-2',
   'AC-17': 'SOLVER-6',
   'AC-18': 'SOLVER-4',
   'AC-19': 'SOLVER-5',

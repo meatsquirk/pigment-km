@@ -6,6 +6,7 @@ import '../types/mix_options.dart';
 import '../types/pigment.dart';
 import '../types/recipe.dart';
 import 'forward.dart';
+import 'inverse.dart';
 import 'mixing_engine.dart';
 
 /// The measured-pigment, two-constant Kubelka–Munk engine (design §6, §10).
@@ -13,8 +14,9 @@ import 'mixing_engine.dart';
 /// The forward model ([forward]/[reflectanceOf]) composes the two-constant
 /// mixing (Σ v·K, Σ v·S) → Kubelka–Munk reflectance → Saunderson surface
 /// correction → spectrum → colour pipeline (see [forwardReflectance]); the
-/// inverse solver is filled by the SOLVER phases and still throws
-/// [UnimplementedError].
+/// inverse solver is the palette-constrained search ([solvePaletteConstrained],
+/// SOLVER-2), with the remaining SOLVER phases layering ranking, out-of-gamut
+/// flagging, the cross-medium partition, accuracy and performance on top.
 class CustomKmEngine implements MixingEngine {
   const CustomKmEngine();
 
@@ -31,7 +33,7 @@ class CustomKmEngine implements MixingEngine {
     List<Pigment> palette,
     MixOptions opts,
   ) =>
-      throw UnimplementedError('CustomKmEngine.inverse — SOLVER phases');
+      solvePaletteConstrained(target, palette, opts);
 
   /// Resolves a paint [id] to its [Pigment] by searching the loaded pigment
   /// table of each medium (design §4). Throws [ArgumentError] if no medium's

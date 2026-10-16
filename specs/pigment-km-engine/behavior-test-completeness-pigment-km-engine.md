@@ -168,3 +168,40 @@ Re-graded after the in-phase fix (fix pass 1): B — the new `srgbToOklch(mapped
 | AC-4 | TestAC04_Saunderson | A (re-confirmed) | `saunderson.dart` untouched. Independent full-formula `refMeasured` per bin for both media + hand anchor (0.12727273) + distinctness controls; pins the k2 term. G-5 constant-lockstep flag unchanged. Green at baseline. |
 | AC-5 | TestAC05_TwoConstantMix | A (re-confirmed) | `forward` calls the refactored `spectrumToColour`, but every assertion is a **relative** ΔE00 between `forward` outputs (self-mix idempotence 0.3≡0.9≡pure; order ab≡ba; mix≠each pure; 25/75≠75/25≠50/50), which is invariant to the colour-maths extraction. Rejects order-dependence, collapse-to-one-component, and a volume-ignoring mix. Green at baseline. |
 | AC-14 | TestAC14_Normalize | A (re-confirmed) | `normalizeParts` and the two-constant mix are unaffected by the colour refactor; the forward equalities are relative ΔE00 comparisons. Asserts the public `normalizeParts` observably (Σ=1, {2/3,1/3}, ratio preserved, ≠ raw 2.0, idempotent) — rejects the identity/non-normalizing impl — with scale-invariance kept as a labelled consistency property + a different-ratio control. Verified green at baseline. |
+
+## Behaviour re-grade — SOLVER-2 (un-pended AC-16; re-confirmed AC-1, AC-3, AC-4, AC-5, AC-14, AC-2) · graded 2026-10-16
+
+Grader: fresh independent adversarial subagent, G1–G6; given all prior grids
+(latest baseline: the COLOR-3 re-grade) and asked to justify any downgrade against
+a named rule. SOLVER-2 un-pends **AC-16** by wiring `CustomKmEngine.inverse` to a
+new `lib/src/engine/inverse.dart` (`solvePaletteConstrained` — subset enumeration
+over the palette + a per-subset simplex-grid optimizer minimizing a new library
+CIEDE2000 `deltaE2000Lab`/`deltaE2000Xyz`; recipes ordered by ΔE00, truncated to
+`topK`; `outOfGamut` hardcoded `false` as a documented SOLVER-4 placeholder).
+Confirmed the change set is surgical: `git diff HEAD` touches only
+`lib/src/engine/inverse.dart` (new), one-line `inverse` wiring in
+`custom_km_engine.dart`, an additive barrel `export … show deltaE2000Lab,
+deltaE2000Xyz`, the pending-gate rows (AC-16 removed from `pending.dart`, added to
+`unpendedACs`), and `engine_test.dart` unit tests — **no change to
+`colour/`, `km/`, `forward.dart`, or any acceptance test / harness file**, so the
+six carried-forward tests run byte-identical code and their prior-A reasoning holds
+unchanged. Default run **+14 ~20 (14 pass, 20 skip), all pass** — AC-16 now
+executes and passes, no longer skipped. Baseline `PIGMENT_KM_RUN_PENDING=true … -x
+stretch` **+17 -15** (the 7 un-pended ACs + AC-6 pass; the 15 still-pending ACs fail
+for the right reason on their precondition/`UnimplementedError`). AC-16 verified
+non-vacuous and discriminating by a throwaway probe: run against the *full* 3-paint
+dataset (the palette-ignoring wrong impl) the reddish target returns the excluded
+`acrylic.naphthol_red` in the top-K recipe list (positions 3–4 of 5), so the
+per-id membership loop fails it. **Result: 7 A.**
+
+| AC | Test | Grade | Notes |
+|---|---|---|---|
+| AC-16 | TestAC16_PaletteOnly | **A** | **Un-pended this phase; genuinely A.** Given checked through the public surface — the constructed palette excludes `acrylic.naphthol_red` (`paletteIds` asserted `isNot(contains(excluded.id))`) and is non-empty. When goes through the real public `engine.inverse(target, palette, MixOptions())` (the free `solvePaletteConstrained` is **not** exported — the test can only reach it via the engine surface). Then asserts the AC's exact observable at grain: every id in every returned recipe's `parts.keys` ∈ `paletteIds`, guarded by `recipes isNotEmpty` (non-vacuous — the 2-paint constrained palette yields 3 recipes {blue},{white},{white,blue}, all within topK=5). **Rejects the named wrong impl** — a solver that ignores the palette arg and reaches into the full dataset: verified by probe that for this reddish target (0.78,0.33,0.33) the full-dataset solve returns red in the top-K, so the membership loop fails on it. One AC per test (G6): asserts nothing about ΔE00, ordering, count, or gamut, so the SOLVER-4 `outOfGamut=false` placeholder and the ungraded ranking/accuracy ACs do not leak in. No G-rule gap; no augmentation owed. |
+| AC-1 | TestAC01_SpectrumToColour | A (re-confirmed) | COLOR/`spectrum_to_colour.dart` untouched by SOLVER-2 (diff touches only engine inverse + gate + unit tests). ΔE00 ≤ 1 to the D65 white point (independent CIEDE2000 yardstick) + Y≈1 + sRGB white; rejects a dropped `yBarD65Sum`/mis-weighted illuminant. Green at baseline. Unchanged single-white G5-floor flag (a non-white published target hardens it post DATA-5). |
+| AC-2 | TestAC02_GamutMap | A (re-confirmed) | `gamutMap`/`oklch.dart`/`colour_math.dart` untouched. The COLOR-3 hardened form stands: unclamped `oklchToLinearSrgb(mapped.oklch)` ∈ [−1e-6, 1+1e-6] per channel (binding red slope ≈ −2.02 collapses the old ~0.006-chroma survival window to ~5e-7) + consistency triple + L/hue preservation; rejects the disguised hard-clip-just-above-boundary impl. Green at baseline. |
+| AC-3 | TestAC03_KmRoundTrip | A (re-confirmed) | `km/reflectance.dart` untouched. R∞∈[0,1] per bin rejects the +√ branch; K/S=0→R=1 anchor; round-trip 1e-5 rejects a dropped f(R) constant. Green at baseline. |
+| AC-4 | TestAC04_Saunderson | A (re-confirmed) | `km/saunderson.dart` untouched. Independent full-formula `refMeasured` per bin for both media + hand anchor (0.12727273) + distinctness controls; pins the k2 internal-reflection term. G-5 constant-lockstep flag unchanged. Green at baseline. |
+| AC-5 | TestAC05_TwoConstantMix | A (re-confirmed) | `forward.dart`/`km/mixing.dart` untouched. Every assertion is a relative ΔE00 between `forward` outputs (self-mix idempotence 0.3≡0.9≡pure; order ab≡ba; mix≠each pure; 25/75≠75/25≠50/50), invariant to the inverse addition. Rejects order-dependence, collapse-to-one-component, and a volume-ignoring mix. Green at baseline. |
+| AC-14 | TestAC14_Normalize | A (re-confirmed) | `normalizeParts` (`forward.dart`) untouched. Asserts the public `normalizeParts` observably (Σ=1, {2/3,1/3}, ratio preserved, ≠ raw 2.0, idempotent) — rejects the identity/non-normalizing impl the scale-invariant colour surface cannot — with scale-invariance kept as a labelled consistency property + a different-ratio control. Green at baseline. |
+
+Result: 7 A.

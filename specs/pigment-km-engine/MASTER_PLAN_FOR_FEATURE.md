@@ -1,7 +1,7 @@
 # Master Plan — pigment_km: measured-pigment Kubelka–Munk mixing engine
 
 **Spec:** [pigment-km-engine.feature](../pigment-km-engine.feature)
-**Status:** In progress — behaviour stage: COLOR-3 ✅ (gamut map live; AC-2 ✅; COLOR module complete); next DATA-2 ∥ FORWARD-4 ∥ SOLVER-2 startable
+**Status:** In progress — behaviour stage: SOLVER-2 ✅ (palette-constrained solver live; AC-16 ✅); next DATA-2 ∥ FORWARD-4 ∥ SOLVER-3 startable
 **Architecture:** [Nuance/docs/custom-mixing-engine-design.md](../../../Nuance/docs/custom-mixing-engine-design.md) (physics §3, datasets §4, forward/inverse §6, tuning §7, staged plan §8, licensing §13) · [Nuance/docs/paint-color-app-solution-intent.md](../../../Nuance/docs/paint-color-app-solution-intent.md) (D3/D6/D7/D9, accuracy NFRs) · consumption contract: `Nuance/lib/recipes/engine/mixing_engine.dart` (bs-04)
 **Code home:** `/Users/matthew.quirk/pigment_km` · remote `https://github.com/meatsquirk/pigment-km` (origin, pushed) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
 
@@ -70,7 +70,7 @@ Greenfield — nothing exists yet; every AC is net-new. The gap is the whole lib
 | AC-13 | Mixing two real pigments desaturates the way real paint does | ITEST-3 `TestAC13_Desaturation` | FORWARD-4 | ⬜ Todo |
 | AC-14 | Volumes are normalized before mixing | ITEST-3 `TestAC14_Normalize` | FORWARD-2 | ✅ |
 | AC-15 | The inverse solver returns ranked recipes preferring fewer paints | ITEST-3 `TestAC15_RankedPreferFewer` | SOLVER-3 | ⬜ Todo |
-| AC-16 | Recipes use only paints in the declared palette | ITEST-3 `TestAC16_PaletteOnly` | SOLVER-2 | ⬜ Todo |
+| AC-16 | Recipes use only paints in the declared palette | ITEST-3 `TestAC16_PaletteOnly` | SOLVER-2 | ✅ |
 | AC-17 | An in-gamut target is matched within the recipe accuracy target | ITEST-3 `TestAC17_InGamut` | SOLVER-6 | ⬜ Todo |
 | AC-18 | An out-of-gamut target is flagged, never faked | ITEST-3 `TestAC18_OutOfGamut` | SOLVER-4 | ⬜ Todo |
 | AC-19 | A single recipe never spans media | ITEST-4 `TestAC19_CrossMedium` | SOLVER-5 | ⬜ Todo |
@@ -163,7 +163,7 @@ Pre-seeded augmentations: AC-7/AC-11/AC-21 strengthened by DATA-5/DATA-7/TUNE-3 
 | KM | [modules/KM.md](modules/KM.md) | KM reflectance, Saunderson, two-constant mixing, concentration | CORE | ✅ Done (KM-2/3/4) |
 | DATA | [modules/DATA.md](modules/DATA.md) | Pigment data model, ingest, resample, NNLS/masstone-tint, build artifact, attribution | CORE, COLOR, KM | 🔄 In progress (DATA-1 ✅) |
 | FORWARD | [modules/FORWARD.md](modules/FORWARD.md) | `forward()` engine over measured pigments | COLOR, KM, DATA | 🔄 In progress (FORWARD-2 ✅) |
-| SOLVER | [modules/SOLVER.md](modules/SOLVER.md) | `inverse()` palette-constrained solver | FORWARD | ⬜ Todo |
+| SOLVER | [modules/SOLVER.md](modules/SOLVER.md) | `inverse()` palette-constrained solver | FORWARD | 🔄 In progress (SOLVER-2 ✅) |
 | TUNE | [modules/TUNE.md](modules/TUNE.md) | Natural-colour tuning: curated palette, chromaPenalty, wet/dry | SOLVER, DATA | ⬜ Todo |
 | PROD | [modules/PROD.md](modules/PROD.md) | Provenance wiring, baseline engine + A/B, interface freeze | SOLVER | ⬜ Todo |
 | STRETCH | [modules/STRETCH.md](modules/STRETCH.md) | Finite-layer glazing, metamerism (optional, G-7) | FORWARD, COLOR | ⬜ Todo |
@@ -237,7 +237,7 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 | 20 | DATA-5 | AC-7 round-trip fidelity | ⬜ Todo | | | needs G-3 |
 | 21 | DATA-6 | AC-9 oil fit | ⬜ Todo | | | needs G-4 |
 | 22 | DATA-7 | AC-11 attribution + provenance | ⬜ Todo | | | needs G-3 wording |
-| 23 | SOLVER-2 | AC-16 palette-only | ⬜ Todo | | | startable (FORWARD-2 ✅) |
+| 23 | SOLVER-2 | AC-16 palette-only | ✅ Done | 9.98M | 17m 22s (1h 13m) | solver live; AC-16 un-pended, green; 7 A |
 | 24 | SOLVER-3 | AC-15 ranked / prefer fewer | ⬜ Todo | | | |
 | 25 | SOLVER-4 | AC-18 out-of-gamut | ⬜ Todo | | | |
 | 26 | SOLVER-5 | AC-19 cross-medium | ⬜ Todo | | | |
@@ -256,9 +256,9 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 
 ## Next phase
 
-**COLOR-3 (OKLCh gamut mapping) ✅ done** — `lib/src/colour/gamut_map.dart`: `gamutMap` reduces OKLCh chroma at fixed L+hue by a 40-step binary search for the largest in-gamut chroma (membership via the unclamped inverse within 1e-7), re-encoding a consistent sRGB/XYZ/OKLCh triple — never a hard clip; in-gamut input returned unchanged. The sRGB/OKLab/XYZ conversions were extracted from `spectrum_to_colour.dart` into `lib/src/colour/oklch.dart` (+ the inverses `oklchToLinearSrgb`, `linearSrgbToXyz`), both backends sharing one matched set (reconciliation; AC-1 re-confirmed A). AC-2 un-pended & green; cov 16/16·42/42·14/14; analyze clean; unit 119/21 skip; acceptance default green (21 pending). Grade **6 A** — AC-2 B→A in-phase (fix 2/3): the weak Thens were vacuous (encoder always clamps), so the fix added a decisive unclamped-in-gamut check via a new independent reference inverse. **COLOR module complete.**
+**SOLVER-2 (palette-constrained search) ✅ done** — new `lib/src/engine/inverse.dart`: `solvePaletteConstrained` enumerates palette subsets (size 1…`maxPaints`, capped at palette size) and fits each subset's volume fractions on a simplex grid minimizing a new library CIEDE2000 (`deltaE2000Lab`/`deltaE2000Xyz`, barrel-exported; the solver fn is not), returning recipes ordered best-first by ΔE00 and truncated to `topK`. Only palette paints are ever considered (resolver built from the palette) → palette-only by construction (AC-16). `CustomKmEngine.inverse` now delegates (was `UnimplementedError`). Recipe provenance = weakest input tier. **Documented placeholders for later SOLVER phases:** `outOfGamut=false` (SOLVER-4), no prefer-fewer tie-break (SOLVER-3), single-medium palette assumed (SOLVER-5), basic grid optimizer (SOLVER-6), no perf cap (SOLVER-7). AC-16 un-pended & green; acceptance default 14/20 skip; unit+acc `dart test` 126 pass/20 skip; analyze clean; cov inverse.dart 109/109·custom_km_engine.dart 11/11. Grade **7 A** (AC-16 newly-live A; AC-1/2/3/4/5/14 re-confirmed — no shared helper touched); fix passes 0/3.
 
-**Startable now (parallel, disjoint files):** **DATA-2** (AC-8 resample, `data/resample.dart`) ∥ **FORWARD-4** (AC-13 desaturation — chroma(KM mix) < chroma(RGB blend), likely test-only over the live `forward`) ∥ **SOLVER-2** (AC-16 palette-only, unblocked by FORWARD-2; `custom_km_engine.dart` `inverse`). Each in its own session (`--parallel` for concurrency); FORWARD-4 and SOLVER-2 both touch `custom_km_engine.dart`/`forward.dart` area, so sequence them or watch the merge. FORWARD-3 (AC-12) stays gated on G-3/G-4.
+**Startable now (parallel, disjoint files):** **SOLVER-3** (AC-15 ranked/prefer-fewer, unblocked by SOLVER-2; `inverse.dart` only) ∥ **DATA-2** (AC-8 resample, `data/resample.dart`) ∥ **FORWARD-4** (AC-13 desaturation — chroma(KM mix) < chroma(RGB blend), likely test-only over the live `forward`). Each in its own session (`--parallel` for concurrency). Merge risk: SOLVER-3 and FORWARD-4 both touch `lib/src/engine/*` — sequence them or watch the merge; DATA-2 is disjoint. SOLVER-3..7 is a chain (SOLVER-3 next). FORWARD-3 (AC-12) stays gated on G-3/G-4.
 
 Dataset gates G-3/G-4/G-5 block only the fidelity/real-palette ACs (AC-7/9/11/12/21); everything else runs on the synthetic fixture (D-7). G-6 adds held-out validation for AC-17; G-7 gates STRETCH. Routing (G-2): AC-23 = post-prediction state transform (TUNE-4).
 
@@ -285,7 +285,8 @@ Dataset gates G-3/G-4/G-5 block only the fidelity/real-palette ACs (AC-7/9/11/12
 | KM-4 | eb784026 | 2026-10-16 13:22 EDT | 13:30 | 8m 09s | 7m 52s | claude-opus-4-8 | 86 | 92,796 | 3,816,973 | 32,531 | 3,942,386 | KM-4 enabler done — mixTwoConstant (Σv·K/Σv·S, no normalise); analyze clean, unit 108/24 skip, coverage 16/16, acceptance green (24 pending); no un-pend (AC-5 gate in FORWARD-2); fix passes 0/3 |
 | FORWARD-2 | 9a6f8357 | 2026-10-16 13:35 EDT | 14:15 | 39m 37s | 17m 53s | claude-opus-4-8 | 176 | 293,333 | 10,877,805 | 60,014 | 11,231,328 | forward model live (normalize→mix→KM→Saunderson→colour) + reflectanceOf; AC-5 + AC-14 un-pended, green; cov forward 28/28, engine 11/11; analyze clean, unit 115/22 skip; grade 5 A (AC-14 B→A in-phase, fix 1/3; exposed normalizeParts) |
 | COLOR-3 | 9e9df8eb | 2026-10-16 14:22 EDT | 14:52 | 30m 37s | 30m 37s | claude-opus-4-8 | 210 | 406,386 | 11,351,837 | 66,365 | 11,824,798 | AC-2 gamut map un-pended, green; 6 A (AC-2 B→A, fix 2/3); COLOR module complete |
-| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-16 14:52** | **5h 17m** | **3h 51m** |  | **1,796** | **2,933,441** | **98,492,730** | **814,048** | **102,242,015** |  |
+| SOLVER-2 | d8949058 | 2026-10-16 18:11 EDT | 19:24 | 1h 13m | 17m 22s | claude-opus-4-8 | 168 | 256,010 | 9,662,102 | 61,298 | 9,979,578 | AC-16 palette-only un-pended, green; 7 A |
+| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-16 19:24** | **6h 30m** | **4h 08m** |  | **1,964** | **3,189,451** | **108,154,832** | **875,346** | **112,221,593** |  |
 
 ## Sign-off
 

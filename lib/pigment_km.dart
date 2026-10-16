@@ -17,6 +17,7 @@ export 'src/data/pigment_table.dart';
 export 'src/data/resample.dart';
 export 'src/engine/custom_km_engine.dart';
 export 'src/engine/forward.dart' show normalizeParts;
+export 'src/engine/inverse.dart' show deltaE2000Lab, deltaE2000Xyz;
 export 'src/engine/mixing_engine.dart';
 export 'src/engine/spectral_baseline_engine.dart';
 export 'src/grid.dart';
