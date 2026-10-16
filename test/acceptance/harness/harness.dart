@@ -10,6 +10,7 @@ library;
 
 import 'package:pigment_km/pigment_km.dart';
 
+export 'colour_math.dart';
 export 'fixtures.dart';
 export 'pending.dart';
 

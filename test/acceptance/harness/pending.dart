@@ -1,7 +1,5 @@
 import 'dart:io';
 
-import 'package:test/test.dart';
-
 /// The pending gate for the acceptance suite (design §8 staged build).
 ///
 /// [pendingACs] maps every not-yet-built Acceptance Criterion to the behaviour
@@ -63,13 +61,26 @@ const Set<String> behaviourPhases = <String>{
 /// (`PIGMENT_KM_RUN_PENDING=true dart test test/acceptance`).
 final bool runPending = Platform.environment['PIGMENT_KM_RUN_PENDING'] == 'true';
 
-/// Call at the top of an AC's acceptance test body. If [acId] is still pending
-/// and the run-pending mode is off, marks the running test skipped (so the
-/// default suite stays green); otherwise the test runs and must pass (behaviour
-/// built) or fail on its Then/precondition (the red baseline).
-void ac(String acId) {
+/// The pending-gate decision for an AC's acceptance test, passed to the
+/// `skip:` argument of `test(...)`:
+///
+/// ```dart
+/// test('AC-1: …', () { /* body */ }, skip: ac('AC-1'));
+/// ```
+///
+/// Returns a skip-reason string when [acId] is still pending and the run-pending
+/// mode is off — so package:test skips the test entirely and its body never runs
+/// (the default suite stays green). Returns `null` when the AC is un-pended, or
+/// under `PIGMENT_KM_RUN_PENDING=true`, so the test runs and must pass (behaviour
+/// built) or fail on its Then/precondition — the red baseline.
+///
+/// (It must be the `skip:` argument, not a call inside the body: a body-level
+/// `markTestSkipped` records a skip but does **not** stop the body executing, so
+/// a pending test would still run its unbuilt When and error.)
+String? ac(String acId) {
   final owner = pendingACs[acId];
   if (owner != null && !runPending) {
-    markTestSkipped('$acId pending: behaviour not built yet (owner: $owner)');
+    return '$acId pending: behaviour not built yet (owner: $owner)';
   }
+  return null;
 }
