@@ -1,7 +1,7 @@
 # Master Plan — pigment_km: measured-pigment Kubelka–Munk mixing engine
 
 **Spec:** [pigment-km-engine.feature](../pigment-km-engine.feature)
-**Status:** In progress — next CORE-2 (shell)
+**Status:** In progress — next DATA-1 (shell)
 **Architecture:** [Nuance/docs/custom-mixing-engine-design.md](../../../Nuance/docs/custom-mixing-engine-design.md) (physics §3, datasets §4, forward/inverse §6, tuning §7, staged plan §8, licensing §13) · [Nuance/docs/paint-color-app-solution-intent.md](../../../Nuance/docs/paint-color-app-solution-intent.md) (D3/D6/D7/D9, accuracy NFRs) · consumption contract: `Nuance/lib/recipes/engine/mixing_engine.dart` (bs-04)
 **Code home:** `/Users/matthew.quirk/pigment_km` · remote `https://github.com/meatsquirk/pigment-km` (origin, pushed) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
 
@@ -158,7 +158,7 @@ Pre-seeded augmentations: AC-7/AC-11/AC-21 strengthened by DATA-5/DATA-7/TUNE-3 
 
 | Module | Plan | Purpose | Depends on | Status |
 |---|---|---|---|---|
-| CORE | [modules/CORE.md](modules/CORE.md) | Package scaffold; canonical grid; core value types; `MixingEngine` interface + stub engines | — | 🔄 In progress |
+| CORE | [modules/CORE.md](modules/CORE.md) | Package scaffold; canonical grid; core value types; `MixingEngine` interface + stub engines | — | ✅ Done |
 | COLOR | [modules/COLOR.md](modules/COLOR.md) | Spectrum→XYZ→sRGB backend + OKLCh gamut map | CORE | ⬜ Todo |
 | KM | [modules/KM.md](modules/KM.md) | KM reflectance, Saunderson, two-constant mixing, concentration | CORE | ⬜ Todo |
 | DATA | [modules/DATA.md](modules/DATA.md) | Pigment data model, ingest, resample, NNLS/masstone-tint, build artifact, attribution | CORE, COLOR, KM | ⬜ Todo |
@@ -216,8 +216,8 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 | # | Phase | Target | Status | Tokens | Time | Notes |
 |---|---|---|---|---|---|---|
 | 1 | CORE-1 | scaffold: package, `dart test`+coverage gate, baseline, acceptance runner | ✅ Done | 3.61M | 6m44s (33m) | G-1 resolved; gate proven |
-| 2 | CORE-2 | shell: core types + `MixingEngine` interface + stub engines + canonical grid | ⬜ Next | | | |
-| 3 | DATA-1 | shell: build-artifact format + loader + synthetic fixture + attribution scaffolding | ⬜ Todo | | | |
+| 2 | CORE-2 | shell: core types + `MixingEngine` interface + stub engines + canonical grid | ✅ Done | 4.25M | 8m49s | grid+types+interface+stubs; analyze clean, 28/28, cov 100% |
+| 3 | DATA-1 | shell: build-artifact format + loader + synthetic fixture + attribution scaffolding | ⬜ Next | | | |
 | 4 | ITEST-1 | acceptance-tests: harness, fixtures, pending gate (all 27), smoke | ⬜ Todo | | | |
 | 5 | ITEST-2 | acceptance-tests: AC-1..9 (pending) + red baseline | ⬜ Todo | | | ∥ ITEST-3/4 |
 | 6 | ITEST-3 | acceptance-tests: AC-10..18 (pending) + red baseline | ⬜ Todo | | | ∥ ITEST-2/4 |
@@ -256,8 +256,8 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 
 ## Next phase
 
-**CORE-2 (shell)** is next — startable now (G-1 resolved, CORE-1 done). Build the core value types + `CanonicalGrid` (31 bins) + `Spectrum` alias + `abstract interface class MixingEngine` + stub `CustomKmEngine`/`SpectralBaselineEngine` (throw `UnimplementedError`, incl. the `reflectanceOf` read endpoint); export the public surface from `lib/pigment_km.dart` (replacing the scaffold's `packageVersion()` marker). Unit-cover constructors/equality/grid invariant to 100%.
-After CORE-2: DATA-1 (shell) can run (∥-friendly, different files), then ITEST-1→ITEST-2∥3∥4→ITEST-5 (test review → G-2) gate the behavior stage.
+**DATA-1 (shell)** is next — startable now (CORE module done: grid, value types, `MixingEngine` + stub engines + `reflectanceOf` read endpoint are in place and frozen). Build the medium-tagged build-artifact format + loader + the synthetic pigment fixture (D-7) + attribution scaffolding; no behaviour. It's the last shell.
+After DATA-1: ITEST-1 (harness over the wired shells — needs CORE-2 **and** DATA-1), then ITEST-2∥3∥4 (one pending test per AC + red baseline, parallelizable) → ITEST-5 (test review → **G-2**) gates the behavior stage.
 Dataset gates still open (block only fidelity/real-palette ACs): G-3/G-4/G-5 (datasets not yet on disk — Golden/RIT permission granted 2026-10-15, MPI oil CC BY 4.0). Scaffold/shells/acceptance/most behavior use the synthetic fixture (D-7). Recommended order once ITEST-5 approved: acrylic S0→S2 critical path (CORE→COLOR→KM→DATA→FORWARD) to the Phase-0.5 ΔE00 gate, then SOLVER (S3), TUNE (S4), PROD (S5); STRETCH (S6) only if G-7 says so.
 
 ## Token usage
@@ -269,7 +269,8 @@ Dataset gates still open (block only fidelity/real-palette ACs): G-3/G-4/G-5 (da
 | PLAN | <this> | | | | | opus-4-8 | | | | | | plan written |
 | PLAN | c99d445d | 2026-10-15 21:14 EDT | 21:32 | 18m 36s | 16m 07s | claude-opus-4-8 | 50 | 156,218 | 3,218,973 | 75,301 | 3,450,542 | plan written |
 | CORE-1 | e9114773 | 2026-10-16 05:48 EDT | 06:21 | 32m 58s | 6m 44s | claude-opus-4-8 | 86 | 76,569 | 3,510,091 | 26,207 | 3,612,953 | scaffold done; coverage gate proven; G-1 approved |
-| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-16 06:21** | **51m 34s** | **22m 51s** |  | **136** | **232,787** | **6,729,064** | **101,508** | **7,063,495** |  |
+| CORE-2 | af675ed1 | 2026-10-16 06:30 EDT | 06:39 | 8m 49s | 8m 49s | claude-opus-4-8 | 88 | 105,042 | 4,109,310 | 37,596 | 4,252,036 | shell: grid+value types+MixingEngine interface+stub engines; analyze clean, 28/28 unit, coverage 100% touched |
+| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-16 06:39** | **1h 00m** | **31m 40s** |  | **224** | **337,829** | **10,838,374** | **139,104** | **11,315,531** |  |
 
 ## Sign-off
 

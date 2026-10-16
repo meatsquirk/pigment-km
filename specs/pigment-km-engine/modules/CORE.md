@@ -1,6 +1,6 @@
 # Module CORE — package scaffold, grid, core types, engine interface
 
-**Status:** In progress — CORE-1 done, next CORE-2
+**Status:** Done — CORE-1 + CORE-2 complete; CORE module exits here
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `pubspec.yaml`, `LICENSE`, `NOTICE`/`ATTRIBUTION.md`, `README.md`, `analysis_options.yaml`, `lib/pigment_km.dart` (public exports), `lib/src/grid.dart`, `lib/src/types/*` (Spectrum alias, `Medium`, `MediumConfig`, `Pigment`, `Recipe`, `Provenance`, `MixOptions`), `lib/src/engine/mixing_engine.dart` (interface), `lib/src/engine/custom_km_engine.dart` + `lib/src/engine/spectral_baseline_engine.dart` (stubs), `tool/coverage_gate.*`
 **Depends on:** — · **Blocks:** every other module
@@ -10,7 +10,7 @@
 | Phase | Kind | Target AC | Status | Tokens | Time |
 |---|---|---|---|---|---|
 | 1 (CORE-1) | scaffold | — | ✅ Done | 3.61M | 6m44s (33m) |
-| 2 (CORE-2) | shell | — | ⬜ Next | | |
+| 2 (CORE-2) | shell | — | ✅ Done | 4.25M | 8m49s |
 
 ## Interface reconciliation
 
@@ -69,6 +69,33 @@ Dart package scaffold stood up and verified.
   4. Stub `CustomKmEngine` and `SpectralBaselineEngine` implementing it with `throw UnimplementedError()` bodies (behavior phases fill them); export the public surface from `lib/pigment_km.dart`.
 - **Exit criteria:** `dart analyze` clean; unit tests cover the type constructors / equality / grid invariant to 100%; stubs throw; `dart test` green; behavior unchanged (nothing solves yet). The `reflectanceOf` read endpoint exists for the acceptance suite's spectral assertions.
 
-### Result  <!-- filled on completion -->
+### Result
 
-### Checkpoint / Handoff  <!-- filled on completion -->
+Public surface stood up: canonical grid, value types, engine interface + throwing stubs. No behaviour — nothing solves yet.
+
+- **Landed (all new under `lib/src/`, exported from `lib/pigment_km.dart`):**
+  - `grid.dart` — `abstract final class CanonicalGrid` (`start/end/step/bins=31`, `wavelengthAt(bin)` with range guard, `checkLength(spectrum)` invariant), `typedef Spectrum = Float32List`, plus `spectraEqual`/`spectrumHash` helpers for element-wise spectrum value-equality.
+  - `types/medium.dart` — `enum Medium{acrylic,oil}`, `WetDryTransform{lightnessDelta,chromaDelta,hueDeltaDeg}` (+`none` identity), `MediumConfig{medium,k1,k2,wetDry}`; value-equal.
+  - `types/provenance.dart` — `enum Provenance{measured,calculated,estimated,confirmed}`.
+  - `types/colour_value.dart` — record typedefs `Srgb`/`Xyz`/`Oklch` + `ColourValue{srgb,xyz,oklch}` (the library's own colour type, D-3, not Flutter's); value-equal.
+  - `types/pigment.dart` — `Pigment{id,name,pigmentIndex,medium,k,s,opacity,provenance,sourceRef}`; equality compares K/S element-wise.
+  - `types/recipe.dart` — `Recipe{medium,parts,colour,deltaE00,provenance,outOfGamut,verdict}`; `parts` equality is order-independent.
+  - `types/mix_options.dart` — `MixOptions{maxPaints=4,topK=5,gamutThreshold=5.0,chromaPenalty=true,wet=true}`.
+  - `engine/mixing_engine.dart` — `abstract interface class MixingEngine{forward,inverse,reflectanceOf}` (the frozen D3 contract; `reflectanceOf` is the spectral read endpoint for the acceptance suite).
+  - `engine/custom_km_engine.dart` + `engine/spectral_baseline_engine.dart` — `const` stubs implementing `MixingEngine`, every method `throw UnimplementedError(...)`.
+  - `lib/pigment_km.dart` — scaffold's `packageVersion()` marker replaced by the real exports; `test/smoke_test.dart` updated to reference the public surface.
+- **Design notes:** `CanonicalGrid` is `abstract final` (static-only namespace — no constructor line to cover). `Srgb/Xyz/Oklch` are Dart record typedefs so colour triples get free structural equality. Stubs are `const` (no state until behaviour phases add `configs`/`pigments`/CMF weights).
+- **Verification:** `dart analyze` → No issues. `dart test` → 28/28 green. Coverage gate (vs CORE-1 base) → **PASS**, 100% lines on every touched source: grid 13/13, pigment 23/23, recipe 25/25, medium 17/17, mix_options 10/10, colour_value 8/8, both engine stubs 7/7; `pigment_km.dart`/`mixing_engine.dart`/`provenance.dart` have no executable lines. Acceptance suite: still none (ITEST phases later), green/empty.
+- **Behaviour unchanged:** every engine method throws; no solve exists. ✔ shell exit criteria.
+- **Fix passes:** 0/3 (passed first run; one post-run lint fix — `== Object()` instead of `== 'literal'` to satisfy `unrelated_type_equality_checks` — counted as authoring, not a gate fix pass).
+- **Tokens / Time:** 4.25M / 8m49s.
+
+### Checkpoint / Handoff
+
+- **Frozen interfaces (behaviour phases build against these, don't reshape without a reconciliation note):**
+  - `MixingEngine { ColourValue forward(Map<String,double> mix); List<Recipe> inverse(ColourValue target, List<Pigment> palette, MixOptions opts); Spectrum reflectanceOf(Map<String,double> mix); }`
+  - `Spectrum = Float32List`, length `CanonicalGrid.bins (31)` on `400–700 nm @ 10 nm`; assert with `CanonicalGrid.checkLength`.
+  - `Pigment`, `Recipe`, `ColourValue` (+`Srgb/Xyz/Oklch`), `MixOptions`, `Medium`, `MediumConfig`/`WetDryTransform`, `Provenance` — all value-equal; see field lists in the Result.
+- **Toolchain / verification (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"` first (dart not on non-interactive PATH). `dart analyze` · `dart test` · coverage gate `bash tool/coverage_gate.sh <BASE>` (or `--files …`) · acceptance default `dart test test/acceptance` · red-baseline `PIGMENT_KM_RUN_PENDING=true dart test test/acceptance`.
+- **Known gaps:** none. Line-coverage-only gate (documented CORE-1 deviation) still applies.
+- **Next:** CORE module is complete. **DATA-1 (shell)** is the next shell (build-artifact format + loader + synthetic fixture + attribution scaffolding; different files, ∥-friendly). Then ITEST-1 (needs both CORE-2 and DATA-1). The engine stubs and `reflectanceOf` read endpoint the acceptance harness observes are in place.
