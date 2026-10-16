@@ -44,7 +44,7 @@ Design §7: curated limited real-pigment palette (lever 1, biggest), `chromaPena
 
 - **Kind:** behavior · **Target AC:** AC-23 (full) · **Depends on:** SOLVER-6 · **Blocks:** SIGNOFF-1
 - **Files:** `wet_dry.dart`, `custom_km_engine.dart` (toggle)
-- **Tasks:** per-medium wet→dry offset (D-12, default wet); re-render colour without re-solving (parts & ΔE00 unchanged); acrylic dry darker + hue-shifted.
+- **Tasks:** per-medium wet→dry offset (D-12, default wet) applied as a **post-prediction state transform** (G-2 2026-10-16 — `forward`/`inverse` stay option-free, the rejected alternative being `forward(mix, opts)`); re-render colour without re-solving (parts & ΔE00 unchanged); acrylic dry darker + hue-shifted. The `MixOptions.wet` toggle is read through `inverse`, not an argument to `forward`.
 - **Exit criteria:** analyze clean; 100% touched; dry≠wet by the documented offset; parts unchanged.
 - **Acceptance gate:** un-pend AC-23; `TestAC23_WetDry` green.
 

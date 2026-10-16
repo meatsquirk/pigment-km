@@ -9,7 +9,7 @@
 
 | Phase | Kind | Target AC | Status | Tokens | Time |
 |---|---|---|---|---|---|
-| 2 (FORWARD-2) | behavior | AC-14 | ⬜ Todo | | |
+| 2 (FORWARD-2) | behavior | AC-14, AC-5 | ⬜ Todo | | |
 | 3 (FORWARD-3) | behavior | AC-12 | ⬜ Todo (G-3/G-4) | | |
 | 4 (FORWARD-4) | behavior | AC-13 | ⬜ Todo | | |
 
@@ -20,14 +20,14 @@
 ## Open gates
 - **G-2** blocks all behavior. **G-3/G-4** block FORWARD-3's measured-mixture fidelity (synthetic until then).
 
-## Phase 2 — FORWARD-2: normalize + forward pipeline (AC-14, enabler)
+## Phase 2 — FORWARD-2: normalize + forward pipeline (AC-14 + AC-5, enabler)
 
-- **Kind:** behavior · **Target AC:** AC-14 (full); also makes `forward`/`reflectanceOf` real for later Givens
+- **Kind:** behavior · **Target AC:** AC-14 (full) **+ AC-5** (moved here from KM-4 per G-2 2026-10-16 — AC-5's colour-level Then runs through `CustomKmEngine.forward`, which this phase makes real); also makes `forward`/`reflectanceOf` real for later Givens
 - **Depends on:** COLOR-3, KM-4, DATA-1 · **Blocks:** FORWARD-3, FORWARD-4, SOLVER-2
 - **Files:** `forward.dart`, `custom_km_engine.dart`
-- **Tasks:** normalize parts to Σ1; assemble the forward pipeline; implement `reflectanceOf`.
-- **Exit criteria:** analyze clean; 100% touched; unnormalized == normalized result.
-- **Acceptance gate:** un-pend AC-14; `TestAC14_Normalize` green.
+- **Tasks:** normalize parts to Σ1; assemble the forward pipeline (composes KM-4 mixing → KM-2 reflectance → KM-3 Saunderson → COLOR spectrum→colour); implement `reflectanceOf`.
+- **Exit criteria:** analyze clean; 100% touched; unnormalized == normalized result; self-mix==pure colour + order-independent mix (AC-5).
+- **Acceptance gate:** un-pend AC-14 **and AC-5**; `TestAC14_Normalize` and `TestAC05_TwoConstantMix` green.
 
 ### Result · Checkpoint  <!-- filled on completion -->
 

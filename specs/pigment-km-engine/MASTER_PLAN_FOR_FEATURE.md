@@ -1,7 +1,7 @@
 # Master Plan — pigment_km: measured-pigment Kubelka–Munk mixing engine
 
 **Spec:** [pigment-km-engine.feature](../pigment-km-engine.feature)
-**Status:** ⏸ Awaiting test review — ITEST-5 packet assembled (27 ACs, 24 A / 3 B-pending); G-2 awaiting human decision, blocks the whole behaviour stage
+**Status:** In progress — behaviour stage open (G-2 approved 2026-10-16); COLOR-2 ∥ KM-2 ∥ DATA-2 startable
 **Architecture:** [Nuance/docs/custom-mixing-engine-design.md](../../../Nuance/docs/custom-mixing-engine-design.md) (physics §3, datasets §4, forward/inverse §6, tuning §7, staged plan §8, licensing §13) · [Nuance/docs/paint-color-app-solution-intent.md](../../../Nuance/docs/paint-color-app-solution-intent.md) (D3/D6/D7/D9, accuracy NFRs) · consumption contract: `Nuance/lib/recipes/engine/mixing_engine.dart` (bs-04)
 **Code home:** `/Users/matthew.quirk/pigment_km` · remote `https://github.com/meatsquirk/pigment-km` (origin, pushed) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
 
@@ -59,7 +59,7 @@ Greenfield — nothing exists yet; every AC is net-new. The gap is the whole lib
 | AC-2 | Colours outside sRGB are gamut-mapped, not clipped | ITEST-2 `TestAC02_GamutMap` | COLOR-3 | ⬜ Todo |
 | AC-3 | Kubelka–Munk reflectance and K/S round-trip | ITEST-2 `TestAC03_KmRoundTrip` | KM-2 | ⬜ Todo |
 | AC-4 | Saunderson correction round-trips per medium | ITEST-2 `TestAC04_Saunderson` | KM-3 | ⬜ Todo |
-| AC-5 | Two-constant mixing is linear and order-independent | ITEST-2 `TestAC05_TwoConstantMix` | KM-4 | ⬜ Todo |
+| AC-5 | Two-constant mixing is linear and order-independent | ITEST-2 `TestAC05_TwoConstantMix` | FORWARD-2 (un-pend) · KM-4 (mixing) | ⬜ Todo |
 | AC-6 | The pigment table ships as a medium-tagged build artifact | ITEST-2 `TestAC06_Artifact` | DATA-3 | ⬜ Todo |
 | AC-7 | Every ingested paint round-trips to its published colour | ITEST-2 `TestAC07_RoundTripFidelity` | DATA-5 | ⬜ Todo |
 | AC-8 | Native dataset grids are resampled onto the canonical grid | ITEST-2 `TestAC08_Resample` | DATA-2 | ⬜ Todo |
@@ -167,7 +167,7 @@ Pre-seeded augmentations: AC-7/AC-11/AC-21 strengthened by DATA-5/DATA-7/TUNE-3 
 | TUNE | [modules/TUNE.md](modules/TUNE.md) | Natural-colour tuning: curated palette, chromaPenalty, wet/dry | SOLVER, DATA | ⬜ Todo |
 | PROD | [modules/PROD.md](modules/PROD.md) | Provenance wiring, baseline engine + A/B, interface freeze | SOLVER | ⬜ Todo |
 | STRETCH | [modules/STRETCH.md](modules/STRETCH.md) | Finite-layer glazing, metamerism (optional, G-7) | FORWARD, COLOR | ⬜ Todo |
-| ITEST | [modules/ITEST.md](modules/ITEST.md) | Acceptance integration suite: one pending test per AC, and its review | CORE, DATA shells | 🔄 In progress (ITEST-1..4 ✅; ITEST-5 ⏸ awaiting G-2) |
+| ITEST | [modules/ITEST.md](modules/ITEST.md) | Acceptance integration suite: one pending test per AC, and its review | CORE, DATA shells | ✅ Done (ITEST-1..5; G-2 approved 2026-10-16) |
 
 ## Dependency graph
 
@@ -196,7 +196,7 @@ graph LR
 | Gate | Kind | Decision needed | Blocks | Status |
 |---|---|---|---|---|
 | G-1 | decision | Approve the spec (record the approval as its first line) | CORE-1 | ✅ Resolved 2026-10-16: spec approved as-is, recorded as its first line — Matt Quirk |
-| G-2 | decision | Approve the acceptance tests (ITEST-5's packet) | every behavior phase | ⏳ Awaiting decision (ITEST-5 packet in [modules/ITEST.md](modules/ITEST.md) §Phase 5, 2026-10-16) |
+| G-2 | decision | Approve the acceptance tests (ITEST-5's packet) | every behavior phase | ✅ Resolved 2026-10-16 11:08 EDT: approved — Matt Quirk. Routing: AC-23 wet/dry = post-prediction state transform (`forward`/`inverse` stay option-free, TUNE-4); AC-5 un-pend moves KM-4 → FORWARD-2 |
 | G-3 | dependency | Obtain + archive the Golden/RIT acrylic K,S data; confirm its exact fields, grid, S-normalization and k1,k2 (design §4 action #2) and the agreed attribution wording with Berns/MCSL (permission granted 2026-10-15) | DATA-5, DATA-7, FORWARD-3, TUNE-3 (real palette) | Open |
 | G-4 | dependency | Obtain the MPI Old Holland oil dataset (CC BY 4.0 — clear) and its mixtures | DATA-6 | Open |
 | G-5 | decision | Confirm per-medium Saunderson k1,k2 + S-normalization from each dataset README | DATA-5, DATA-6 (folds into G-3/G-4 acquisition) | Open |
@@ -222,13 +222,13 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 | 5 | ITEST-2 | acceptance-tests: AC-1..9 (pending) + red baseline | ✅ Done | 10.94M | 30m 21s | 8 A / 1 B-pending-DATA-6; red baseline +1/−8 (AC-6 green); Option-A backend stubs added |
 | 6 | ITEST-3 | acceptance-tests: AC-10..18 (pending) + red baseline | ✅ Done | 10.79M | 22m 28s | 9 A (AC-11/12 data-limited); red baseline −9 each naming its owner; Option-A DATA-4 stub added |
 | 7 | ITEST-4 | acceptance-tests: AC-19..27 (pending) + red baseline | ✅ Done | 6.34M | 16m 10s | 6 A / 1 A-data-limited (AC-21) / 2 B-pending (AC-26/27, G-7); red baseline −9 each for the right reason; no Option-A stubs; `@stretch` tagged |
-| 8 | ITEST-5 | test-review: packet; G-2 | ⏸ Awaiting review | 2.27M | 5m 13s | packet assembled (27 ACs, 24 A / 3 B-pending); suite re-verified green + red baseline; G-2 awaiting decision |
+| 8 | ITEST-5 | test-review: packet; G-2 | ✅ Done | 2.27M | 5m 13s | packet assembled (27 ACs, 24 A / 3 B-pending); G-2 approved 2026-10-16 (AC-23 post-prediction transform; AC-5 un-pend → FORWARD-2) |
 | 9 | COLOR-2 | AC-1 spectrum→colour | ⬜ Todo | | | ∥ KM-2, DATA-2 |
 | 10 | COLOR-3 | AC-2 gamut map | ⬜ Todo | | | |
 | 11 | KM-2 | AC-3 KM round-trip | ⬜ Todo | | | ∥ COLOR-2, DATA-2 |
 | 12 | KM-3 | AC-4 Saunderson | ⬜ Todo | | | |
-| 13 | KM-4 | AC-5 two-constant mixing | ⬜ Todo | | | |
-| 14 | FORWARD-2 | AC-14 normalize (enabler for forward) | ⬜ Todo | | | |
+| 13 | KM-4 | two-constant mixing (enabler; AC-5 un-pends in FORWARD-2) | ⬜ Todo | | | |
+| 14 | FORWARD-2 | AC-14 normalize + AC-5 un-pend (enabler for forward) | ⬜ Todo | | | |
 | 15 | FORWARD-3 | AC-12 forward fidelity | ⬜ Todo | | | needs G-3/G-4 |
 | 16 | FORWARD-4 | AC-13 desaturation | ⬜ Todo | | | |
 | 17 | DATA-2 | AC-8 resample | ⬜ Todo | | | ∥ COLOR-2, KM-2 |
@@ -256,14 +256,11 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 
 ## Next phase
 
-**ITEST-5 is done** — the acceptance-test review packet is assembled in [modules/ITEST.md](modules/ITEST.md) §Phase 5 and the phase is `⏸ Awaiting review`. The whole stage (ITEST-1..5) is now at the human gate. **Nothing is startable until G-2 resolves** — G-2 blocks every behaviour phase.
+**G-2 approved 2026-10-16** — the acceptance stage is closed and the behaviour stage is open. Routing decisions recorded: **AC-23** wet/dry is a **post-prediction state transform** (`forward`/`inverse` stay option-free; TUNE-4 re-renders colour without re-solving); **AC-5**'s un-pend moves **KM-4 → FORWARD-2** (KM-4 stays the mixing enabler).
 
-**→ A human reviews the packet and records the decision:**
-`/feature-next-phase --gate pigment-km-engine G-2 approved`  (or `… G-2 "changes: <items>"`).
+**Startable now (parallel, disjoint files):** **COLOR-2** (AC-1 spectrum→colour) ∥ **KM-2** (AC-3 KM round-trip) ∥ **DATA-2** (AC-8 resample). Each in its own session (`--parallel` for concurrency).
 
-The packet: 27 ACs, one pending test each through the public surface; grades **24 A / 3 B-pending** (AC-9→DATA-6, AC-26→STRETCH-2, AC-27→STRETCH-3 — all sanctioned gate/data deferrals); live re-verify this session green (default 70/27 skipped) + red baseline (26/27 fail for-cause, AC-6 green). Six "look at first" items are in the packet — foremost the **AC-23 wet/dry interface decision** G-2 should settle, and the **AC-5 owner mismatch** (colour Then needs FORWARD-2, not KM-4).
-
-**On approval**, the behaviour stage opens: **COLOR-2 ∥ KM-2 ∥ DATA-2** start in parallel (disjoint files). Recommended order: acrylic critical path (COLOR→KM→DATA→FORWARD) to the ΔE00 gate, then SOLVER, TUNE, PROD; STRETCH only if G-7 approves scope. Dataset gates G-3/G-4/G-5 block only the fidelity/real-palette ACs; everything else uses the synthetic fixture (D-7). **On changes requested**, each item becomes an ITEST change phase, then ITEST-6 re-review.
+Recommended order: acrylic critical path (COLOR→KM→DATA→FORWARD) to the ΔE00 gate, then SOLVER, TUNE, PROD; STRETCH only if G-7 approves scope. Dataset gates G-3/G-4/G-5 block only the fidelity/real-palette ACs (AC-7/9/11/12/21); everything else runs on the synthetic fixture (D-7). G-6 adds held-out validation for AC-17; G-7 gates STRETCH.
 
 ## Token usage
 
@@ -281,7 +278,8 @@ The packet: 27 ACs, one pending test each through the public surface; grades **2
 | ITEST-3 | 70fbb425 | 2026-10-16 08:35 EDT | 08:58 | 22m 28s | 22m 28s | claude-opus-4-8 | 152 | 273,308 | 10,438,132 | 80,246 | 10,791,838 | AC-10..18 pending + red baseline; 9 A (AC-11/12 data-limited, AC-15 fixed B→A); Option-A DATA-4 stub; analyze clean, default 70/18, coverage PASS |
 | ITEST-4 | 0f8bbd98 | 2026-10-16 09:10 EDT | 09:27 | 16m 10s | 16m 10s | claude-opus-4-8 | 108 | 202,680 | 6,082,471 | 57,386 | 6,342,645 | AC-19..27 pending + red baseline (−9 each right reason); grades 6 A / 1 A-data-limited / 2 B-pending (G-7); no Option-A stubs; @stretch tagged |
 | ITEST-5 | 1e7e17af | 2026-10-16 10:09 EDT | 10:15 | 5m 13s | 5m 13s | claude-opus-4-8 | 46 | 107,864 | 2,143,635 | 19,764 | 2,271,309 | packet assembled; ⏸ awaiting G-2 decision; 24 A / 3 B-pending; suite re-verified green + red baseline |
-| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-16 10:15** | **2h 36m** | **2h 06m** |  | **854** | **1,478,000** | **49,388,495** | **491,910** | **51,359,259** |  |
+| SIGNOFF-DECISION | 4716a8e4 | 2026-10-16 10:46 EDT | 11:12 | 25m 52s | 5m 30s | claude-opus-4-8 | 66 | 77,272 | 2,826,847 | 24,635 | 2,928,820 | ITEST-5 approved |
+| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-16 11:12** | **3h 02m** | **2h 12m** |  | **920** | **1,555,272** | **52,215,342** | **516,545** | **54,288,079** |  |
 
 ## Sign-off
 

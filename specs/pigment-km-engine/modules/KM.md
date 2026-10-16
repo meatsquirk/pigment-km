@@ -11,7 +11,7 @@
 |---|---|---|---|---|---|
 | 2 (KM-2) | behavior | AC-3 | ⬜ Todo | | |
 | 3 (KM-3) | behavior | AC-4 | ⬜ Todo | | |
-| 4 (KM-4) | behavior | AC-5 | ⬜ Todo | | |
+| 4 (KM-4) | enabler | — (mixing for AC-5) | ⬜ Todo | | |
 
 ## Interface reconciliation
 
@@ -45,14 +45,13 @@ Implements design §3.1 (reflectance + inverse), §3.2 (Saunderson, per-medium k
 ### Result  <!-- filled on completion -->
 ### Checkpoint / Handoff  <!-- filled on completion -->
 
-## Phase 4 — KM-4: two-constant mixing + concentration (AC-5)
+## Phase 4 — KM-4: two-constant mixing + concentration (enabler — AC-5 un-pends in FORWARD-2)
 
-- **Kind:** behavior · **Target AC:** AC-5 (full)
+- **Kind:** enabler · **Target AC:** — (the two-constant-mixing mechanism AC-5 needs; its un-pend moved to **FORWARD-2** per G-2 2026-10-16, because AC-5's colour-level Then runs through `CustomKmEngine.forward`)
 - **Depends on:** KM-3 · **Blocks:** FORWARD-2
 - **Files:** `mixing.dart`
 - **Tasks:** `Kmix=Σv·K`, `Smix=Σv·S` elementwise; concentration = volume fraction (§5); self-mix idempotence; order-independence.
-- **Exit criteria:** analyze clean; 100% touched; self-mix==pure colour; permutation invariance.
-- **Acceptance gate:** un-pend AC-5; `TestAC05_TwoConstantMix` green.
+- **Exit criteria:** analyze clean; 100% touched; self-mix==pure colour; permutation invariance (unit-level — AC-5's acceptance gate is in FORWARD-2).
 
 ### Result  <!-- filled on completion -->
 ### Checkpoint / Handoff  <!-- filled on completion -->

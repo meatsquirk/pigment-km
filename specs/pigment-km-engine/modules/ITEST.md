@@ -1,6 +1,6 @@
 # Module ITEST — acceptance integration suite
 
-**Status:** 🔄 In progress (ITEST-1..4 ✅; ITEST-5 packet assembled — ⏸ awaiting G-2 decision)
+**Status:** ✅ Done (ITEST-1..5 ✅; G-2 approved 2026-10-16 — behaviour stage open)
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `test/acceptance/*` (harness, fixtures, pending gate, one test per AC), `test/acceptance/fixtures/*`
 **Depends on:** CORE-2, DATA-1 (shells) · **Blocks:** every behavior phase (via G-2)
@@ -13,7 +13,7 @@
 | 2 (ITEST-2) | acceptance-tests | AC-1..9 | ✅ Done | 10.94M | 30m 21s |
 | 3 (ITEST-3) | acceptance-tests | AC-10..18 | ✅ Done | 10.79M | 22m 28s |
 | 4 (ITEST-4) | acceptance-tests | AC-19..27 | ✅ Done | 6.34M | 16m 10s |
-| 5 (ITEST-5) | test-review | — | ⏸ Awaiting review | 2.27M | 5m 13s |
+| 5 (ITEST-5) | test-review | — | ✅ Done (G-2 approved) | 2.27M | 5m 13s |
 
 ## Interface reconciliation
 - **Boundary:** the package's public API only (`lib/pigment_km.dart` exports) — `spectrumToColour`/gamut-map, `kmReflectance`/`kmFunction`/`saunderson`, `MixingEngine.forward`/`inverse`/`reflectanceOf`, `PigmentTable.load`, the value types. No test reaches into `lib/src` internals. Engines assembled exactly as a consumer would (the same construction the README documents) — the only non-test code this module may touch is that one shared constructor; the coverage gate applies to it.
@@ -72,7 +72,7 @@
 - **Frozen for ITEST-3/4:** `skip: ac('AC-n')` is the pending convention (NOT a body call). The CIEDE2000 helper `deltaE00(Xyz,Xyz)` / `deltaE00Lab(...)` is in the harness barrel. The backend stubs now exist — ITEST-3/4's AC tests call the real public surface uniformly.
 - **For the behaviour phases (un-pend = delete the AC's row in `pending.dart`):**
   - **COLOR-2** `spectrumToColour`, **COLOR-3** `gamutMap`, **KM-2** `kmReflectance`/`kmFunction`, **KM-3** `configForMedium`/`saundersonToMeasured`/`saundersonToInternal`, **DATA-2** `resampleOntoCanonical` — fill these stub bodies (signatures frozen here; change them only with a recorded reason).
-  - ⚠ **AC-5 owner mismatch:** AC-5's colour-level Then goes through `CustomKmEngine.forward`, which lands in **FORWARD-2**, not KM-4 (its pending owner). KM-4 alone cannot make AC-5 green. The behaviour stage should either move AC-5's un-pend to FORWARD-2 or expose a public K,S-mixing surface for a KM-4-level assertion — a decision for G-2 / behaviour planning. Flagged, not rewired.
+  - ⚠ **AC-5 owner mismatch → resolved by G-2 (2026-10-16):** AC-5's colour-level Then goes through `CustomKmEngine.forward` (FORWARD-2), not KM-4. **G-2 moved AC-5's un-pend to FORWARD-2**; KM-4 stays the two-constant-mixing enabler (no new public K,S surface). FORWARD-2 un-pends AC-5 and makes `TestAC05_TwoConstantMix` green.
   - **AC-6 green at baseline:** kept pending→DATA-3 and recorded green rather than cascade-edit the ITEST-1 bijection guard in an AC phase. The G-2 reviewer may un-pend it now; otherwise DATA-3 keeps it green (its decode-from-asset switch is not observable through AC-6). Its asset-path Given (`assets/pigments/synthetic_<medium>.json`) must survive any rename by DATA-3/DATA-5.
   - **AC-7** (DATA-5) / **AC-9** (DATA-6): data-limited. AC-7 has a live Then behind a G-3 precondition — DATA-5 just switches the fixture to real data. **AC-9 is B pending DATA-6: DATA-6 must ADD the executable Then** (NNLS fit on train, held-out ΔE00 ≤ 5, coeffs ≥ 0, disjoint split), not merely flip `isReal`.
 - **Verification (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"` first. `dart analyze` · `dart test` · acceptance default/red-baseline as above · `bash tool/coverage_gate.sh <BASE>` (line-only).
@@ -124,7 +124,7 @@
   - ⚠ **AC-19 (SOLVER-5):** add a constructed cross-medium-tempting target as a control (the test uses a generic grey target; the catalogue's explicit control isn't built).
   - ⚠ **AC-21 (TUNE-3):** confirm/tune the *real* naturalistic chroma ceiling — the test trusts a provisional in-test ceiling (0.25) on the synthetic palette and does **not** gate behind an `isReal` precondition; TUNE-3 must ship the curated palette **and** harden the ceiling.
   - ⚠ **AC-22 (TUNE-2):** construct the guaranteed equal-ΔE00 2-vs-3-paint tie the test's `expect(sawTie, isTrue)` depends on, **together with** the un-pend — until then the test is over-constrained on an absent natural tie (same AC-15/SOLVER-3 treatment).
-  - ⚠ **AC-23 (TUNE-4 / G-2):** resolve the forward-vs-inverse wet/dry interface — `forward()` takes no options, so the test reads wet/dry via `inverse(MixOptions.wet)`+`Recipe.colour` and asserts parts unchanged; TUNE-4/the interface must make wet/dry a post-prediction state transform (or add `forward(mix, opts)`) so the best recipe is stable across states.
+  - ⚠ **AC-23 wet/dry interface → resolved by G-2 (2026-10-16):** wet/dry is a **post-prediction state transform** — `forward`/`inverse` stay option-free; the test reads wet/dry via `inverse(MixOptions.wet)`+`Recipe.colour`. TUNE-4 applies the per-medium wet→dry offset after prediction so parts & the chosen recipe are stable across states. (`forward(mix, opts)` was the rejected alternative.)
 - **Verification (reuse):** `dart analyze` · `dart test` · acceptance default/red-baseline as above · `dart test -x stretch` excludes AC-26/27.
 - **Next:** **ITEST-5** — the test review (assemble the packet, set `⏸ Awaiting review`, G-2 *awaiting decision*). Preconditions now met: all three AC-test phases done; whole-suite grid all A or *B pending <phase>* with an augmentation row. G-2 gates the whole behaviour stage.
 
@@ -136,7 +136,7 @@
 
 ### Result · Checkpoint
 
-**Status: ⏸ Awaiting review — G-2 awaiting decision.** The full acceptance suite (one pending integration test per AC, ITEST-2/3/4) is assembled below for a human to approve before any behaviour is coded. No `lib/` or test code changed this phase — a review-only session.
+**Status: ✅ Done — G-2 approved 2026-10-16 11:08 EDT by Matt Quirk.** The full acceptance suite (one pending integration test per AC, ITEST-2/3/4) was approved as assembled; no changes requested. Routing decisions recorded at G-2: (1) **AC-23** wet/dry = post-prediction state transform — `forward`/`inverse` stay option-free, TUNE-4 re-renders colour without re-solving (parts stable across states); (2) **AC-5** un-pend moves **KM-4 → FORWARD-2** (FORWARD-2's `forward` makes the colour-level Then green; KM-4 remains the two-constant-mixing enabler). The behaviour stage is open: COLOR-2 ∥ KM-2 ∥ DATA-2 startable. No `lib/` or test code changed this phase — a review-only session.
 
 **Preconditions met (verified live this session):**
 - All three AC-test phases (ITEST-2/3/4) ✅ Done; all 27 ACs have one pending test through the package's **public surface only** (no reach into `lib/src`).
