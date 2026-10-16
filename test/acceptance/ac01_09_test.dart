@@ -75,6 +75,28 @@ void main() {
           reason: 'hue must be preserved');
       expect(mapped.oklch.c, lessThan(outOfGamut.oklch.c),
           reason: 'chroma must be reduced to reach the gamut');
+      // … and the reported colour is GENUINELY inside the gamut: its UNCLAMPED
+      // linear sRGB (via the independent reference) already lies in [0,1], so no
+      // channel is hard-clipped by the encoder. This is the decisive reject: the
+      // bare `mapped.srgb ∈ [0,1]` check above is vacuous (the gamma encoder
+      // always clamps), so a mapper that stops just above the gamut boundary and
+      // leans on that clamp to hide a still-negative channel would otherwise pass
+      // while faking the match. The 1e-6 grain is tighter than any boundary
+      // excess, so (unlike a tolerance on the clamped sRGB) it leaves no window.
+      final reportedLinear = oklchToLinearSrgb(mapped.oklch);
+      expect(reportedLinear.r, inInclusiveRange(-1e-6, 1 + 1e-6),
+          reason: 'red channel genuinely in gamut — no hidden hard-clip');
+      expect(reportedLinear.g, inInclusiveRange(-1e-6, 1 + 1e-6),
+          reason: 'green channel genuinely in gamut — no hidden hard-clip');
+      expect(reportedLinear.b, inInclusiveRange(-1e-6, 1 + 1e-6),
+          reason: 'blue channel genuinely in gamut — no hidden hard-clip');
+      // … and the displayable sRGB is consistent with that reported OKLCh (the
+      // independent reference re-derives the same hue and lightness from it).
+      final refOklch = srgbToOklch(mapped.srgb);
+      expect(refOklch.l, closeTo(mapped.oklch.l, 5e-3),
+          reason: 'reported lightness matches the sRGB actually returned');
+      expect(hueDiffDeg(refOklch.h, mapped.oklch.h), lessThan(0.5),
+          reason: 'reported hue matches the sRGB actually returned');
       // … and it is NOT a hard clip of the out-of-range channels (which would
       // pin a channel and shift hue). Rejects the naive per-channel clamp.
       final clamped = (

@@ -1,6 +1,6 @@
 # Module COLOR — spectrum → colour backend
 
-**Status:** In progress (COLOR-2 ✅; COLOR-3 startable)
+**Status:** ✅ Done — module complete (COLOR-2 ✅, COLOR-3 ✅)
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/colour/spectrum_to_colour.dart`, `lib/src/colour/gamut_map.dart`, `lib/src/colour/cmf_d65_weights.dart` (precomputed x̄·D65, ȳ·D65, z̄·D65 on the canonical grid), `lib/src/colour/oklch.dart`
 **Depends on:** CORE · **Blocks:** FORWARD, STRETCH
@@ -10,7 +10,7 @@
 | Phase | Kind | Target AC | Status | Tokens | Time |
 |---|---|---|---|---|---|
 | 2 (COLOR-2) | behavior | AC-1 | ✅ Done | 7.64M | 17m 38s |
-| 3 (COLOR-3) | behavior | AC-2 | ⬜ Todo | | |
+| 3 (COLOR-3) | behavior | AC-2 | ✅ Done | 11.82M | 30m 37s |
 
 ## Interface reconciliation
 
@@ -59,5 +59,23 @@ Spectrum→colour backend landed; AC-1 un-pended and green.
 - **Exit criteria:** `dart analyze` clean; 100% line+branch on touched files; hue & L preserved within tol in tests.
 - **Acceptance gate:** un-pend AC-2; `TestAC02_GamutMap` green.
 
-### Result  <!-- filled on completion -->
-### Checkpoint / Handoff  <!-- filled on completion -->
+### Result
+
+OKLCh gamut mapper landed; AC-2 un-pended and green. COLOR module complete.
+
+- **Landed:** `lib/src/colour/oklch.dart` (new) — the colour-space conversion primitives, extracted from `spectrum_to_colour.dart` so forward and inverse share one matched set (no duplicated matrices): `encodeGamma`, `xyzToLinearSrgb`, `linearSrgbToOklch` (moved; the COLOR-2 forward) plus the new inverses `oklchToLinearSrgb` (OKLCh→linear, Ottosson inverse constants) and `linearSrgbToXyz`. `lib/src/colour/gamut_map.dart` — `gamutMap`: the out-of-gamut signal is the OKLCh chroma (a predicted colour's displayable sRGB is already clamped); an in-gamut colour is returned unchanged, otherwise chroma is reduced at **fixed** OKLCh L+hue by a 40-step binary search for the largest in-gamut chroma (membership via the unclamped `oklchToLinearSrgb` within 1e-7), then re-encoded into a consistent (sRGB∈[0,1], XYZ, OKLCh) triple — never a hard clip. `spectrum_to_colour.dart` now imports the shared primitives (behaviour byte-equivalent).
+- **Interface reconciliation (as the COLOR-2 handoff anticipated):** the OKLab/sRGB/XYZ maths were private in `spectrum_to_colour.dart`; COLOR-3 extracted them into `oklch.dart` (adding the two inverses) and re-covered both. `spectrum_to_colour.dart` is a reconciliation edit (its public signature and output are unchanged); AC-1 re-confirmed A against the moved code.
+- **Verification:** `dart analyze` → No issues · unit `dart test` → **119 passed / 21 skipped / 0 failed** (new `test/gamut_map_test.dart`: gamutMap out-of-gamut + in-gamut-unchanged + oklch/xyz round-trips) · coverage gate (vs BASE `5a53564`) → **PASS** (`gamut_map.dart` 16/16, `oklch.dart` 42/42, `spectrum_to_colour.dart` 14/14) · acceptance default `dart test test/acceptance` → **13 passed / 21 skipped** (AC-2 moved skip→pass; was 12/22) · AC-2 under `PIGMENT_KM_RUN_PENDING=true` green. Coverage is line-only (CORE metric deviation); every branch (in-gamut early return, both search arms) exercised by test design.
+- **Test maintenance (recorded — strengthening, not weakening):** (1) un-pending AC-2 removed its `pendingACs` row → added `'AC-2':'COLOR-3'` to `unpendedACs` (the bijection guard still pins all 27). (2) Removed the now-false `gamutMap throws UnimplementedError` stub assertion (and its now-empty COLOR group) from `test/backends_stub_test.dart`; its docstring updated. (3) **Hardened `TestAC02_GamutMap`** (grade gate, see below): its original Thens were vacuous (`mapped.srgb∈[0,1]` always holds — the gamma encoder clamps). Added, in two passes, a decisive assertion that the mapper's *reported* OKLCh converts back (via a new **independent** reference inverse `oklchToLinearSrgb` added to `test/acceptance/harness/colour_math.dart`, Ottosson constants, not the library export) to UNCLAMPED linear sRGB ∈ [−1e-6, 1+1e-6], plus an end-to-end hue/L consistency triple — so an out-of-gamut mapper that hides a hard-clipped channel behind the encoder is rejected.
+- **Grades:** behaviour grade gate re-graded **every** un-pended AC test (AC-1, AC-2, AC-3, AC-4, AC-5, AC-14) in fresh independent subagents. AC-2 graded **B** (G4: the weak Thens let a hard-clip stopping ≤~0.006 chroma above the boundary pass), fixed in-phase over two passes and re-graded **A** each time by fresh graders (the unclamped-in-gamut check shrinks the survival window to ~5e-7 chroma). Others **A (re-confirmed)** — AC-1 through the moved-but-equivalent colour code; AC-5/AC-14 assert only relative ΔE00 between `forward` outputs, invariant to the extraction. Final: **6 A**.
+- **Fix passes:** 2/3 (both on AC-2's grade: fix 1 the consistency triple — insufficient; fix 2 the unclamped-in-gamut check — A).
+- **Tokens / Time:** 11.82M / 30m 37s.
+
+### Checkpoint / Handoff
+
+- **Frozen interfaces (don't reshape without a reconciliation note):**
+  - `gamutMap(ColourValue) → ColourValue` — maps on the OKLCh chroma axis at fixed L+hue; returns a consistent triple; in-gamut input returned unchanged.
+  - `oklch.dart` exposes `encodeGamma`, `xyzToLinearSrgb`, `linearSrgbToXyz`, `linearSrgbToOklch`, `oklchToLinearSrgb` (library-internal — NOT exported from the `pigment_km` barrel). `spectrum_to_colour.dart` and `gamut_map.dart` both import them.
+  - Independent test reference `colour_math.dart` now also exposes `oklchToLinearSrgb` (the acceptance yardstick's own inverse; distinct from the library's — the AC-2 test imports the reference one via the barrel-free harness, the unit test hides it to use the library's).
+- **Verification commands (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"` first. Analyze `dart analyze`; unit `dart test`; coverage `bash tool/coverage_gate.sh <BASE>`; acceptance default `dart test test/acceptance`, red-baseline `PIGMENT_KM_RUN_PENDING=true dart test test/acceptance`. Un-pend = delete the AC row in `pending.dart` **and** add it to `unpendedACs` in `pending_gate_test.dart` **and** drop its stub-throw row in `backends_stub_test.dart`.
+- **Known gaps:** none for AC-1/AC-2. The COLOR module is complete; no further COLOR phases. `gamutMap` is available for any later phase that needs display-safe sRGB (SOLVER out-of-gamut/target handling may reuse it).

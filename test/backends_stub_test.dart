@@ -3,31 +3,19 @@ import 'dart:typed_data';
 import 'package:pigment_km/pigment_km.dart';
 import 'package:test/test.dart';
 
-/// Unit coverage for the public backend stubs added in ITEST-2 (Option A): the
-/// COLOR, KM-physics and ingest functions the acceptance suite calls through.
+/// Unit coverage for the public backend stubs added in ITEST-2 (Option A) that
+/// are still pending: the ingest functions the acceptance suite calls through.
 ///
 /// Each is an `UnimplementedError` stub until its behaviour phase (named in the
 /// message) fills the body; this suite pins that contract and keeps the new
 /// files fully covered in the default run (the acceptance red-baseline run
-/// exercises them through the AC tests, but that run is pending-gated).
+/// exercises them through the AC tests, but that run is pending-gated). The
+/// COLOR stubs (`spectrumToColour`, `gamutMap`) are now implemented — covered by
+/// test/colour_test.dart and test/gamut_map_test.dart.
 void main() {
   final spectrum = Float32List.fromList(
     List<double>.filled(CanonicalGrid.bins, 0.5),
   );
-
-  const target = ColourValue(
-    srgb: (r: 0.1, g: 0.2, b: 0.3),
-    xyz: (x: 0.4, y: 0.5, z: 0.6),
-    oklch: (l: 0.7, c: 0.1, h: 120.0),
-  );
-
-  group('COLOR backend stubs throw their documented UnimplementedError', () {
-    // spectrumToColour is implemented in COLOR-2 (see test/colour_test.dart);
-    // only the gamutMap stub remains until COLOR-3.
-    test('gamutMap — COLOR-3', () {
-      expect(() => gamutMap(target), throwsUnimplementedError);
-    });
-  });
 
   group('ingest stub throws its documented UnimplementedError', () {
     test('resampleOntoCanonical — DATA-2', () {

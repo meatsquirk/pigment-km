@@ -10,6 +10,7 @@ import 'harness/harness.dart';
 /// AC to the phase that delivered it, mirroring [pendingACs]'s AC→phase shape.
 const Map<String, String> unpendedACs = <String, String>{
   'AC-1': 'COLOR-2',
+  'AC-2': 'COLOR-3',
   'AC-3': 'KM-2',
   'AC-4': 'KM-3',
   'AC-5': 'KM-4',

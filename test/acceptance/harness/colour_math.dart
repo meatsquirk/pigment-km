@@ -52,6 +52,29 @@ Oklch srgbToOklch(Srgb c) {
   return (l: okL, c: chroma, h: hue);
 }
 
+/// Linear-light sRGB of an OKLCh colour — the independent inverse of the OKLab
+/// maths in [srgbToOklch] (Ottosson's inverse constants). Channels fall outside
+/// `[0,1]` exactly when the OKLCh colour is out of the sRGB gamut, so a gamut
+/// mapper's *reported* OKLCh can be checked for being GENUINELY in gamut here —
+/// unlike a mapper's displayable sRGB, which the gamma encoder always clamps and
+/// which therefore cannot reveal a hard-clipped (out-of-gamut) channel.
+({double r, double g, double b}) oklchToLinearSrgb(Oklch c) {
+  final hRad = c.h * math.pi / 180.0;
+  final a = c.c * math.cos(hRad);
+  final b = c.c * math.sin(hRad);
+  final lc = c.l + 0.3963377774 * a + 0.2158037573 * b;
+  final mc = c.l - 0.1055613458 * a - 0.0638541728 * b;
+  final sc = c.l - 0.0894841775 * a - 1.2914855480 * b;
+  final l = lc * lc * lc;
+  final m = mc * mc * mc;
+  final s = sc * sc * sc;
+  return (
+    r: 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    g: -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    b: -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
+  );
+}
+
 /// Builds a consistent [ColourValue] (sRGB, XYZ, OKLCh of the same colour) from
 /// an sRGB triple via the independent reference, so acceptance targets carry all
 /// three representations the way the engine's own output does.
