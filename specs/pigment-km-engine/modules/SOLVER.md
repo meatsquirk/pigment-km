@@ -1,6 +1,6 @@
 # Module SOLVER — the inverse solver
 
-**Status:** In progress — SOLVER-3 ✅ (ranked / prefer-fewer-on-tie live; AC-15 ✅); next SOLVER-4
+**Status:** In progress — SOLVER-4 ✅ (honest out-of-gamut flag live; AC-18 ✅); next SOLVER-5 (AC-19 cross-medium)
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/engine/inverse.dart` (subset enumeration, per-subset optimizer, ranking, out-of-gamut, medium partition), `lib/src/engine/custom_km_engine.dart` (`inverse`)
 **Depends on:** FORWARD · **Blocks:** TUNE, PROD
@@ -11,7 +11,7 @@
 |---|---|---|---|---|---|
 | 2 (SOLVER-2) | behavior | AC-16 | ✅ Done | 9.98M | 17m 22s (1h 13m) |
 | 3 (SOLVER-3) | behavior | AC-15 | ✅ Done | 14.65M | 26m 58s (3h 30m) |
-| 4 (SOLVER-4) | behavior | AC-18 | ⬜ Todo | | |
+| 4 (SOLVER-4) | behavior | AC-18 | ✅ Done | 8.64M | 16m 37s (17m 34s) |
 | 5 (SOLVER-5) | behavior | AC-19 | ⬜ Todo | | |
 | 6 (SOLVER-6) | behavior | AC-17 | ⬜ Todo (G-6 evidence) | | |
 | 7 (SOLVER-7) | behavior | AC-20 | ⬜ Todo (exclusive lane) | | |
@@ -158,7 +158,63 @@ AC-15 un-pended (deleted from `pending.dart`; added to `unpendedACs` in
 - **Exit criteria:** analyze clean; 100% touched; unreachable target flagged; in-gamut target not flagged (control).
 - **Acceptance gate:** un-pend AC-18; `TestAC18_OutOfGamut` green.
 
-### Result · Checkpoint  <!-- filled on completion -->
+### Result · Checkpoint
+
+**Result (SOLVER-4 · AC-18).** Out-of-gamut is now an **honest, target-level**
+verdict in `solvePaletteConstrained` (`lib/src/engine/inverse.dart`). After the
+ranking + topK cut, `ranked.first.deltaE00` (the best achievable distance) is
+compared to `opts.gamutThreshold` (default 5.0): when it exceeds the ceiling no
+palette mixture can reach the target, so **every** returned recipe is mapped
+through the new private `_flaggedOutOfGamut` — `outOfGamut: true` and the verdict
+relabelled `"out of gamut — nearest ΔE00 X.XX"`, with `parts`, `colour`,
+`deltaE00` and `provenance` carried through unchanged so the distance stays
+honest and never reads as a match (SI fixed intent). When the best is within the
+ceiling the target is reachable and the set returns unflagged, so a weaker
+in-top-K alternative is not mislabelled.
+- **Design deviation from the prep note (improvement):** the note suggested
+  swapping the `outOfGamut: false` placeholder *inside* `_bestRecipeForSubset`
+  (per-recipe). That would flag any single recipe over 5 even for a reachable
+  target and break the in-gamut control (`engine_test` `outOfGamut isFalse`). The
+  AC is "no *mixture* can reach the target", i.e. a property of the **best**, so
+  the flag is computed once on `ranked.first` and applied set-wide. `Recipe` is
+  immutable, so a re-stamp helper is used rather than mutation.
+- **Acceptance:** un-pend AC-18 (deleted from `pendingACs`, added to
+  `unpendedACs` → SOLVER-4). `TestAC18_OutOfGamut` green default + run-pending.
+  **Augmented in-phase** (strengthen-only, AC-18's own Then, G6-safe): also
+  asserts the relabelled verdict reads "out of gamut", pinning "never reports it
+  as a match" (previously only the flag covered it) — closes a grader flag.
+- **Verification:** `dart analyze` clean · `dart test` **133 passed / 18 skipped
+  / 0 failed** (new `engine_test` group "out-of-gamut honesty": saturated-green
+  target flagged + never-a-match; reachable target leaves a beyond-ceiling
+  alternative unflagged → rejects a per-recipe flag) · acceptance default
+  `dart test test/acceptance` **17 passed / 18 skipped** · coverage gate (vs BASE
+  `02d19ae`) **PASS** (`inverse.dart` **122/122** lines; +9 lines all covered —
+  the oog branch both ways, `_flaggedOutOfGamut` body). Line-only metric as before.
+- **Grade gate:** fresh independent adversarial subagent, G1–G6, given the prior
+  grids → **9 A, 0 B** (AC-18 A; AC-1/2/3/4/5/14/15/16 re-confirmed A — SOLVER-4
+  is a working-tree change touching only `inverse.dart` + the pending/unit files,
+  and the re-stamp preserves order/distance/parts, so no neighbour shifts). Fix
+  passes **0/3** (passed first run). Grid: `behavior-test-completeness-pigment-km-engine.md`
+  → *Behaviour re-grade — SOLVER-4*.
+- **Augmentations:** none owed to other ACs. Carried flags (no grade change): the
+  **AC-17/AC-18 pairing** closes when SOLVER-6 un-pends AC-17 (the in-gamut
+  non-flagging behaviour exists now); and a **yardstick cross-check** on
+  `best.deltaE00` could further pin "honest" — AC-18's own, deferred (optional).
+
+**Checkpoint / Handoff.**
+- **Frozen interface (unchanged surface):** `CustomKmEngine.inverse` →
+  `solvePaletteConstrained`, same signature/exports. `outOfGamut` is now set
+  honestly; `_flaggedOutOfGamut` is private. Out-of-gamut is target-level (keyed
+  on the best recipe), applied to the whole returned set.
+- **Verification commands (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"`
+  first. `dart analyze`; `dart test`; coverage `bash tool/coverage_gate.sh <BASE>`;
+  acceptance default `dart test test/acceptance`.
+- **For SOLVER-5 (AC-19, cross-medium):** partition the palette by medium, search
+  each separately, never emit a recipe spanning media (§4.3). Current code assumes
+  a single-medium palette (`medium = palette.first.medium`); SOLVER-5 replaces
+  that with the per-medium partition. The oog flag stays as-is (applies per solve).
+  Known gaps still open: basic grid optimizer / ΔE00 ≤ 5 accuracy (SOLVER-6); no
+  perf cap (SOLVER-7).
 
 ## Phase 5 — SOLVER-5: cross-medium rule (AC-19)
 

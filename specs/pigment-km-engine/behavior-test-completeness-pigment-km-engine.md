@@ -234,3 +234,32 @@ pass). **Final: 8 A.**
 | AC-16 | TestAC16_PaletteOnly | A (re-confirmed) | inverse.dart's ranking changed, but AC-16 asserts only order-independent per-id membership with `recipes isNotEmpty`; the 2-paint palette yields 3 recipes ≤ topK (no truncation), so the comparator change cannot affect it. Rejects a full-dataset-reaching solver. |
 
 Result: 8 A.
+
+## Behaviour re-grade — SOLVER-4 (AC-18) · graded 2026-10-17
+
+Grader: fresh independent adversarial subagent, G1–G6, given the prior grids and
+asked to justify any downgrade against a named rule. SOLVER-4's only lib change is
+`lib/src/engine/inverse.dart` (the target-level gamut gate + the `_flaggedOutOfGamut`
+re-stamp); the pending/unit files and the AC-18 acceptance test are the other
+changes — **no harness fixture, no colour/km/forward module touched.** The re-stamp
+maps over `ranked` in order and carries `parts`/`colour`/`deltaE00`/`provenance`
+through unchanged, so it cannot reorder, re-count or alter any neighbour's recipes.
+**Result: 9 A, 0 B, 0 fixes owed (passed first run, fix 0/3).**
+
+| AC | Test | Grade | Notes |
+|---|---|---|---|
+| AC-18 | TestAC18_OutOfGamut | **A** | **Un-pended this phase.** Given checked (`oogColour.oklch.c > 0.2`; fixture palette has no green primary). When via the real public `engine.inverse`. Then at grain: `best.outOfGamut isTrue` + `best.deltaE00 > gamutThreshold (5)` + (augmented in-phase, AC-18's own Then, G6-safe) `best.verdict` contains "out of gamut" → pins "never reports it as a match". Rejects the AC's named wrong impl (nearest mix unflagged) and the pre-phase hardcoded-`false` placeholder — both red at baseline. One AC per test (G6): asserts nothing about in-gamut non-flagging (AC-17's Then). |
+| AC-1 | TestAC01_SpectrumToColour | A (re-confirmed) | COLOR pipeline not in inverse.dart's path. ΔE00 ≤ 1 to D65 white + Y≈1 + sRGB white. |
+| AC-2 | TestAC02_GamutMap | A (re-confirmed) | `gamut_map.dart`/`oklch.dart`/`colour_math.dart` untouched. Unclamped round-trip + L/hue preservation; rejects the disguised hard clip. |
+| AC-3 | TestAC03_KmRoundTrip | A (re-confirmed) | `km/reflectance.dart` untouched. R∞∈[0,1] rejects the +√ branch; K/S=0→R=1 anchor. |
+| AC-4 | TestAC04_Saunderson | A (re-confirmed) | `km/saunderson.dart` untouched. Independent full-formula per bin + hand anchor + distinctness controls. |
+| AC-5 | TestAC05_TwoConstantMix | A (re-confirmed) | `forward.dart`/`km/mixing.dart` untouched. Idempotence + order-independence + volume controls. |
+| AC-14 | TestAC14_Normalize | A (re-confirmed) | `normalizeParts` untouched. Σ=1, {2/3,1/3}, ratio preserved, ≠ raw, idempotent + control. |
+| AC-15 | TestAC15_RankedPreferFewer | A (re-confirmed) | Comparator untouched; the flag re-stamp preserves order/`deltaE00`/`parts.length`, so base + constructed-tie both hold. Verified passing in the run. |
+| AC-16 | TestAC16_PaletteOnly | A (re-confirmed) | `_flaggedOutOfGamut` carries `parts` through, so the (possibly-flagged) reddish-target solve cannot change `parts.keys`; per-id membership holds. |
+
+### AC-18 carried flags (no grade change)
+- **AC-17/AC-18 pairing is one-sided until SOLVER-6.** AC-18 alone passes an "always-flag" impl; the in-gamut-non-flag reject lives in AC-17 (pending, SOLVER-6). The behaviour exists now (`if (ranked.first.deltaE00 <= gamutThreshold) return ranked;`), so the pairing closes when SOLVER-6 un-pends AC-17. Adding an in-gamut control inside AC-18 would reach AC-17's Then (G6) — the split is correct.
+- **"honest ΔE00" asserted as `> 5` only,** not cross-checked against the independent yardstick `deltaE00(best.colour.xyz, target.xyz)`. Core intent (distance not understated) is covered; a yardstick cross-check (AC-18's own) would fully pin it — optional hardening.
+
+Result: 9 A.
