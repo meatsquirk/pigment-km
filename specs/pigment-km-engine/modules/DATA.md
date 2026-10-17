@@ -1,6 +1,6 @@
 # Module DATA — datasets, ingestion, build artifact, attribution
 
-**Status:** In progress — DATA-1 done; DATA-8 (synthetic-fixture hue fix, enabler, G-8) added 2026-10-17 → next; DATA-2..7 AC phases also startable (G-2 approved)
+**Status:** In progress — DATA-1 ✅; DATA-8 ✅ (synthetic fixture now hue-faithful, G-8, 2026-10-17 — cool-blue reachable ΔE00 3.69, 10 A re-grade); DATA-2..7 AC phases startable (G-2 approved; DATA-5/6/7 gated on G-3/G-4)
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/data/pigment_table.dart` (loader), `lib/src/data/artifact_format.dart`, `lib/src/data/resample.dart`, `lib/src/data/masstone_tint.dart`, `lib/src/data/nnls_fit.dart`, `lib/src/data/synthetic_fixture.dart`, `assets/pigments/*` (shipped build artifacts, medium-tagged), `NOTICE`/`ATTRIBUTION.md`, `tool/ingest/*` (offline ingest scripts, not shipped at runtime)
 **Depends on:** CORE, COLOR, KM · **Blocks:** FORWARD-3, SOLVER (real palette), TUNE-3; **DATA-8 blocks SOLVER-6** (the fixture must render faithful hues before AC-17's in-gamut target is reachable)
@@ -16,7 +16,7 @@
 | 5 (DATA-5) | behavior | AC-7 | ⬜ Todo (G-3) | | |
 | 6 (DATA-6) | behavior | AC-9 | ⬜ Todo (G-4) | | |
 | 7 (DATA-7) | behavior | AC-11 | ⬜ Todo (G-3) | | |
-| 8 (DATA-8) | enabler | — | ⬜ Next (G-8) | | |
+| 8 (DATA-8) | enabler | — | ✅ Done | — | — |
 
 ## Interface reconciliation
 
@@ -137,4 +137,56 @@ Verify (green): `dart analyze` clean · `dart test` **54/54** (+26; 28 pre-exist
 - **Exit criteria:** analyze clean; 100% of touched lines/branches; `phthalo_blue`/`naphthol_red` (and oil paints) render hues consistent with their names; whole suite green (default + run-pending, only later phases' ACs pending); AC-18 green; the AC-17 cool-blue region reachable ≤ 5 (recorded).
 - **Acceptance gate:** *(enabler — un-pends no AC)* the whole acceptance suite stays green; **re-grade every un-pended AC test** with a fresh adversarial subagent (the fixture is a shared helper → neighbours may shift) → all A (or *B pending <phase>* with a row).
 
-### Result · Checkpoint  <!-- filled on completion -->
+### Result · Checkpoint
+
+**Done 2026-10-17.** Inverted the `_chroma` K Gaussian so a paint **reflects** at
+its named hue (`k = 0.05 + 0.9·(1 − e^{−d²})`, `d=(i−peakBin)/6`, S flat 0.3,
+`_white` unchanged) — the earlier non-inverted form peaked absorption K *at* the
+hue, rendering the complement. Moved two peak bins so the rendered sRGB matches
+the name: acrylic **phthalo_blue 4→6**, oil **yellow_ochre 10→18**
+(naphthol_red 22 and oil ultramarine 6 render correctly once inverted, kept).
+Peak bins chosen empirically by rendering each pure paint through the real
+forward path (`forwardColour`).
+
+- **Rendered hues now faithful** (pure paint, OKLCh h): phthalo_blue h≈275 (blue,
+  sRGB(0.309,0.347,0.570)), naphthol_red h≈28 (warm red, sRGB(0.580,0.353,0.323)),
+  oil ultramarine h≈275 (blue), oil yellow_ochre h≈87 (yellow,
+  sRGB(0.548,0.480,0.326)). Blue/red hues differ 113° (AC-13 control intact).
+- **Assets regenerated** — `assets/pigments/synthetic_{acrylic,oil}.json`
+  rewritten via `PigmentArtifactCodec.encode(SyntheticFixture.artifact(m))+"\n"`;
+  the `data_test.dart` parity test (byte-exact) passes.
+- **No test hardcoded a rendered synthetic colour** that shifted — unit/AC tests
+  are self-referential (`forward({…})` as target) or structural/relative, so none
+  were edited (no assertion weakened).
+- **Gates:** `dart analyze` clean; default suite **136 pass / 17 pending skipped**;
+  run-pending red baseline correct — the only failures are the 13 later-phase
+  unbuilt ACs (AC-7/8/9/10/11/12 data+forward, 21/22/23/24/25 tune+prod, 26/27
+  stretch); coverage **32/32 lines** on the single touched file
+  `synthetic_fixture.dart` (coverage gate PASS).
+- **AC-18 control holds:** pure sRGB green stays out-of-gamut (best ΔE00 **32.40**,
+  `outOfGamut` true) — palette is still white/blue/red, no green primary.
+- **AC-17 target now reachable (recorded for SOLVER-6):** cool-blue sRGB(0.72,
+  0.76,0.86) best ΔE00 **3.69**, `outOfGamut` false, recipe **white 0.917 +
+  phthalo_blue 0.083**. Reachable cool-blue region = light, white-dominated blue
+  tints (white fraction ≈ 0.88–0.97). In run-pending AC-17 now passes; SOLVER-6
+  un-pends it.
+- **Grade gate:** fresh adversarial subagent re-graded all 10 un-pended AC tests
+  → **10 A, 0 downgrades**; AC-16 and AC-19 controls *strengthened* (their
+  "tempting" targets now point at genuinely correct-hued paints). Band appended to
+  `behavior-test-completeness-pigment-km-engine.md`.
+- **Fix passes:** 0/3 (passed first full run).
+
+**Checkpoint / Handoff.** Verification (from repo root, `export PATH="$HOME/development/flutter/bin:$PATH"`):
+`dart analyze lib test` · `dart test` (default, green) ·
+`PIGMENT_KM_RUN_PENDING=true dart test test/acceptance` (red baseline) ·
+`bash tool/coverage_gate.sh HEAD`. `SyntheticFixture._chroma` is now hue-faithful;
+`PigmentTable.load` builds from it directly (assets kept in parity by the test).
+**For SOLVER-6 (AC-17):** the synthetic cool-blue target is genuinely in-gamut —
+solve with white+phthalo_blue; best ΔE00 ≈ 3.69 today (SOLVER-6 may tighten the
+optimizer but the fixture no longer blocks ≤5). **Drift to resolve (not DATA-8's
+to fix):** `SOLVER.md` still lists SOLVER-6 *Depends on: SOLVER-5, FORWARD-3* and
+neither plan lists DATA-8 as SOLVER-6's dependency, although G-8/DATA-8 was created
+to unblock SOLVER-6 and FORWARD-3 is gated on G-3/G-4 real data — the SOLVER-6
+dependency set needs a planner reconcile (drop FORWARD-3 if AC-17 is the synthetic
+target; add DATA-8). `assets/*` and `tool/ingest/*` are DATA-module-owned but
+`tool/ingest/` is untracked DATA-5/6 ingest material — left untouched, not staged.

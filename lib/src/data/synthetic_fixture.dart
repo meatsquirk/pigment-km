@@ -27,7 +27,7 @@ abstract final class SyntheticFixture {
           pigments: <Pigment>[
             _white(medium, 'titanium_white', 'Titanium White', 'PW6'),
             _chroma(medium, 'phthalo_blue', 'Phthalo Blue', 'PB15',
-                peakBin: 4, opacity: 0.55),
+                peakBin: 6, opacity: 0.55),
             _chroma(medium, 'naphthol_red', 'Naphthol Red', 'PR170',
                 peakBin: 22, opacity: 0.6),
           ],
@@ -41,7 +41,7 @@ abstract final class SyntheticFixture {
             _chroma(medium, 'ultramarine', 'Ultramarine Blue', 'PB29',
                 peakBin: 6, opacity: 0.4),
             _chroma(medium, 'yellow_ochre', 'Yellow Ochre', 'PY43',
-                peakBin: 10, opacity: 0.7),
+                peakBin: 18, opacity: 0.7),
           ],
         );
     }
@@ -58,8 +58,16 @@ abstract final class SyntheticFixture {
     return _pigment(medium, id, name, index, k, s, opacity: 0.95);
   }
 
-  /// A chromatic pigment whose absorption K peaks near [peakBin], over a modest,
-  /// flat scattering S — a smooth, non-negative stand-in for a real curve.
+  /// A chromatic pigment that *reflects* near [peakBin] — its absorption K dips
+  /// to a floor at [peakBin] and rises away from it, so the paint renders a hue
+  /// consistent with its name (a reflectance band at its own wavelength), not the
+  /// complement. Over a modest, flat scattering S — a smooth, non-negative
+  /// stand-in for a real curve.
+  ///
+  /// `K = 0.05 + 0.9·(1 − e^{−d²})` with `d = (i − peakBin)/6`: an *inverted*
+  /// Gaussian (low absorption at the hue, high absorption elsewhere). The earlier
+  /// non-inverted form peaked K *at* the hue, so every paint absorbed its own
+  /// wavelength and rendered its complement (G-8, fixed in DATA-8).
   static Pigment _chroma(
     Medium medium,
     String id,
@@ -72,7 +80,7 @@ abstract final class SyntheticFixture {
     final s = Float32List(CanonicalGrid.bins);
     for (var i = 0; i < CanonicalGrid.bins; i++) {
       final d = (i - peakBin) / 6.0;
-      k[i] = 0.05 + 0.9 * math.exp(-d * d);
+      k[i] = 0.05 + 0.9 * (1 - math.exp(-d * d));
       s[i] = 0.3;
     }
     return _pigment(medium, id, name, index, k, s, opacity: opacity);

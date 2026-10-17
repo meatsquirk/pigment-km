@@ -292,3 +292,34 @@ owed (passed first run, fix 0/3).**
 | AC-18 | TestAC18_OutOfGamut | A (re-confirmed) | synthPigments (acrylic) + oogColour → single group; the gamut gate still keys on `ranked.first` (pooling cannot change `ranked.first` for a single-medium palette). `outOfGamut isTrue` + `deltaE00 > 5` + verdict "out of gamut". |
 
 Result: 10 A.
+
+## DATA-8 re-grade (shared-fixture hue fix, enabler) · graded 2026-10-17
+
+Grader: fresh independent adversarial subagent, G1–G6, seeded with the bands
+above. **Re-confirmed by a second independent adversarial subagent in the DATA-8
+completion session (2026-10-17): identical verdict — 10 A, 0 downgrades, 0 fixes
+owed; AC-16/AC-19 discrimination strengthened by the fix, AC-18 green still
+out-of-gamut (best ΔE00 32.40), no stale/vacuous row.** DATA-8 inverted the synthetic fixture's `_chroma` K Gaussian (paints now
+*reflect* at their named hue instead of absorbing it → rendering the complement)
+and moved two peak bins (acrylic phthalo_blue 4→6, oil yellow_ochre 10→18). The
+fixture is the shared helper every `synthPigments`-based AC renders against, so
+every **un-pended** AC test (AC-1/2/3/4/5/14/15/16/18/19) was re-graded for
+whether the hue rotation weakened its discrimination. `dart test` green (136
+passed, 17 pending skipped). **Result: 10 A, 0 downgrades, 0 fixes owed.**
+
+| AC | Test | Grade | Renders vs. fixture? | Justification (did the hue-fix change discrimination?) |
+|---|---|---|---|---|
+| AC-1 | TestAC01_SpectrumToColour | A | No — `perfectDiffuser`/D65 white | No pigment touched. |
+| AC-2 | TestAC02_GamutMap | A | No — constructed OOG `ColourValue` | No pigment touched. |
+| AC-3 | TestAC03_KmRoundTrip | A | Yes — reads blue K/S | New K/S∈[0.167,3.167], all >0 → Given holds; R∞∈[0,1]/anchor/round-trip are KM-math, hue-independent. |
+| AC-4 | TestAC04_Saunderson | A | No — constructed ramp | Unchanged. |
+| AC-5 | TestAC05_TwoConstantMix | A | Yes — white+blue forward | Coarse ΔE00 controls (mix vs pures 13.8/30.8 ≫1; 25/75≠75/25 16.4 ≫1) swamp the hue rotation; scale/order checks hue-independent. |
+| AC-14 | TestAC14_Normalize | A | Yes (forward only) | Σ1 / ratio-preserved / rejects-identity are parts-map math; forward consistency + ratio control hue-independent. |
+| AC-15 | TestAC15_RankedPreferFewer | A | Yes — grey solve | 5 ranked candidates, ΔE00 non-decreasing [0.75,11.9,14.8,18.2,19.3]; grey reachable old & new; constructed-tie companion uses fixture-independent twins. |
+| AC-16 | TestAC16_PaletteOnly | A (strengthened) | Yes — reddish target, red excluded | Best uses only {white,blue}; excluded red never appears. Red now renders red (h≈28) → the reddish target is genuinely tempting (was its cyan complement before), so the dataset-reaching reject fires harder. |
+| AC-18 | TestAC18_OutOfGamut | A | Yes — green vs white/blue/red | Green stays unreachable: best ΔE00 32.40 (≫5), `outOfGamut` true, verdict "out of gamut". No green primary at any hue assignment. |
+| AC-19 | TestAC19_CrossMedium | A (strengthened) | Yes — oil yellow_ochre control | Best medium oil, bestDist≈0, acrylicBest 18.76; oil yellow now renders yellow (h≈86.6), genuinely unreachable by acrylic white/blue/red → sharper first-medium-only reject. |
+
+Note: AC-17 (cool-blue in-gamut) remains **pending** (owner SOLVER-6) so it is
+outside this un-pended re-grade; DATA-8 only makes its target reachable
+(ΔE00 3.69 via white 0.917 + phthalo_blue 0.083, recorded for SOLVER-6).
