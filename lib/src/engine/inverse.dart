@@ -11,20 +11,21 @@ import 'forward.dart';
 /// The inverse solver (design §6.2) — SOLVER-2 the palette-constrained search,
 /// SOLVER-3 the ranking (best-first by ΔE00, preferring fewer paints on a tie),
 /// SOLVER-4 the honest out-of-gamut flag (an unreachable target's recipes are
-/// flagged nearest approaches, never claimed matches).
+/// flagged nearest approaches, never claimed matches), SOLVER-5 the cross-medium
+/// partition (a single recipe never spans media).
 ///
 /// Given a [target] colour, the user's declared [palette] and the solve [opts],
 /// returns candidate mixing [Recipe]s drawn **only** from that palette. Later
-/// SOLVER phases build on this base: SOLVER-5 the explicit per-medium partition,
-/// SOLVER-6 a tighter optimizer, SOLVER-7 the performance budget.
+/// SOLVER phases build on this base: SOLVER-6 a tighter optimizer, SOLVER-7 the
+/// performance budget.
 ///
-/// Every candidate is formed by enumerating subsets of the palette (size 1 up to
-/// [MixOptions.maxPaints], capped at the palette size) and fitting the volume
-/// fractions of each subset to the target. Because the only paints considered
-/// come from [palette], no paint outside it can ever appear in a recipe (AC-16).
-/// The subsets are drawn from a single-medium palette — the cross-medium
-/// partition and its guarantee are SOLVER-5's; here the recipe medium is the
-/// palette's medium.
+/// Every candidate is formed by enumerating subsets of **one medium's** paints
+/// (size 1 up to [MixOptions.maxPaints], capped at that medium's paint count) and
+/// fitting the volume fractions of each subset to the target. Because the only
+/// paints considered come from [palette], no paint outside it can ever appear in
+/// a recipe (AC-16); and because each subset is drawn from a single medium's
+/// group, no recipe ever spans media (AC-19, design §4.3) — its declared medium
+/// is that group's medium.
 ///
 /// The returned list is ranked by [_byDeltaThenFewerPaints] — best-first by
 /// ΔE00, the simpler (fewer-paint) recipe first on an exact ΔE00 tie (AC-15) —
@@ -40,15 +41,32 @@ List<Recipe> solvePaletteConstrained(
   }
   final byId = <String, Pigment>{for (final p in palette) p.id: p};
   Pigment resolve(String id) => byId[id]!;
-  final medium = palette.first.medium;
-  final maxK = math.min(opts.maxPaints, palette.length);
+
+  // AC-19 / design §4.3 — the cross-medium hard constraint. A single recipe may
+  // never span media, so the palette is partitioned by [Medium] and each
+  // medium's paints are searched independently: every subset enumerated below is
+  // drawn from one group, so each recipe's paints — and its declared medium —
+  // come from exactly that medium. The groups' candidates are then pooled and
+  // ranked together, so the global best-first order (AC-15) and the target-level
+  // out-of-gamut verdict (AC-18) are unchanged; a cross-medium mixture is simply
+  // never formed, even one that would land closer to the target. A single-medium
+  // palette yields a single group — exactly the earlier per-palette search. The
+  // groups keep the palette's medium-first-seen order, so ranking is
+  // deterministic across runs.
+  final byMedium = <Medium, List<Pigment>>{};
+  for (final p in palette) {
+    (byMedium[p.medium] ??= <Pigment>[]).add(p);
+  }
 
   final candidates = <Recipe>[];
-  for (var k = 1; k <= maxK; k++) {
-    for (final subset in _subsetsOfSize(palette, k)) {
-      candidates.add(_bestRecipeForSubset(subset, target, medium, resolve));
+  byMedium.forEach((medium, group) {
+    final maxK = math.min(opts.maxPaints, group.length);
+    for (var k = 1; k <= maxK; k++) {
+      for (final subset in _subsetsOfSize(group, k)) {
+        candidates.add(_bestRecipeForSubset(subset, target, medium, resolve));
+      }
     }
-  }
+  });
   candidates.sort(_byDeltaThenFewerPaints);
   final ranked = candidates.length <= opts.topK
       ? candidates

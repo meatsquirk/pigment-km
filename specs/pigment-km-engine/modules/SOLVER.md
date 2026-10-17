@@ -1,6 +1,6 @@
 # Module SOLVER — the inverse solver
 
-**Status:** In progress — SOLVER-4 ✅ (honest out-of-gamut flag live; AC-18 ✅); next SOLVER-5 (AC-19 cross-medium)
+**Status:** In progress — SOLVER-5 ✅ (per-medium partition live; AC-19 ✅); next SOLVER-6 (AC-17 in-gamut ≤5)
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/engine/inverse.dart` (subset enumeration, per-subset optimizer, ranking, out-of-gamut, medium partition), `lib/src/engine/custom_km_engine.dart` (`inverse`)
 **Depends on:** FORWARD · **Blocks:** TUNE, PROD
@@ -12,8 +12,8 @@
 | 2 (SOLVER-2) | behavior | AC-16 | ✅ Done | 9.98M | 17m 22s (1h 13m) |
 | 3 (SOLVER-3) | behavior | AC-15 | ✅ Done | 14.65M | 26m 58s (3h 30m) |
 | 4 (SOLVER-4) | behavior | AC-18 | ✅ Done | 8.64M | 16m 37s (17m 34s) |
-| 5 (SOLVER-5) | behavior | AC-19 | ⬜ Todo | | |
-| 6 (SOLVER-6) | behavior | AC-17 | ⬜ Todo (G-6 evidence) | | |
+| 5 (SOLVER-5) | behavior | AC-19 | ✅ Done | 7.94M | 13m 46s |
+| 6 (SOLVER-6) | behavior | AC-17 | ⬜ Next (G-6 evidence) | | |
 | 7 (SOLVER-7) | behavior | AC-20 | ⬜ Todo (exclusive lane) | | |
 
 ## Interface reconciliation
@@ -224,7 +224,66 @@ in-top-K alternative is not mislabelled.
 - **Exit criteria:** analyze clean; 100% touched; no recipe spans media even when a cross-medium mix would be closer (control).
 - **Acceptance gate:** un-pend AC-19; `TestAC19_CrossMedium` green.
 
-### Result · Checkpoint  <!-- filled on completion -->
+### Result · Checkpoint
+
+**Result (SOLVER-5 · AC-19).** `solvePaletteConstrained` in
+`lib/src/engine/inverse.dart` now **partitions the palette by `Medium`** (a
+`<Medium, List<Pigment>>` map built in palette-first-seen order) and searches each
+medium's group independently — the subset enumeration + per-subset fit runs once
+per group, so every candidate (and its declared medium) is drawn from exactly one
+medium. The groups' candidates are pooled into one list, then the existing
+ranking (`_byDeltaThenFewerPaints`), `topK` cut and target-level out-of-gamut gate
+run unchanged. No recipe can span media (AC-19 / design §4.3); a single-medium
+palette yields one group, i.e. byte-for-byte the prior per-palette behaviour, so
+AC-15/AC-16/AC-18 are untouched (grader re-confirmed).
+- **Key finding (shapes the control):** the forward model (`forward.dart`)
+  **throws** on any mix spanning media — a cross-medium mixture cannot be
+  evaluated at all. So a "cross-medium blend" target is physically inexpressible,
+  and an *unpartitioned* solver on a mixed palette would THROW (not silently emit
+  a cross-medium recipe) — which is how the primary assertion rejects the
+  pre-phase code.
+- **Augmentation closed (TestAC19 → SOLVER-5):** the ITEST-4 carry-forward flag
+  ("add a constructed cross-medium-tempting control") is resolved. Because a true
+  cross-medium blend can't be a target, the control instead uses a target equal to
+  a pure **oil** paint's colour (oil is second in the palette); it asserts the best
+  recipe is `Medium.oil` with ΔE00 ≈ 0 and that the acrylic group alone lands
+  strictly farther — proving the solver searches **each** medium separately, not
+  just `palette.first.medium`, and rejecting a first-medium-only solver.
+- **Verification:** `dart analyze` clean · `dart test` **136 passed / 17 skipped
+  / 0 failed** (new SOLVER-5 unit group in `engine_test.dart`: mixed-palette
+  single-medium invariant + the second-medium-reachable control; the stale
+  cross-medium-forward unit test was reworked, not added, to respect the guard) ·
+  acceptance default `dart test test/acceptance` **18 passed / 17 skipped** (AC-19
+  skip→pass) · AC-19 green under `PIGMENT_KM_RUN_PENDING=true` · coverage gate (vs
+  BASE `13c3ac7`) **PASS** (`inverse.dart` **125/125** lines; +3 lines — the
+  partition map build and the per-group loop, both arms covered by the
+  single-medium existing tests and the new mixed-palette tests). Line-only metric
+  (CORE deviation) as before.
+- **Grade gate:** fresh independent adversarial subagent, G1–G6, given the prior
+  grids → **10 A, 0 B** (AC-19 A; AC-1/2/3/4/5/14/15/16/18 re-confirmed — the
+  partition is behaviourally identical on single-medium palettes and touches no
+  colour/km/forward code). Fix passes **0/3** (passed first run). Grid:
+  `behavior-test-completeness-pigment-km-engine.md` → *Behaviour re-grade —
+  SOLVER-5*.
+- **Augmentations:** TestAC19 closed (above). None newly enabled for other ACs.
+- **Tokens / time:** see dashboard.
+
+**Checkpoint / Handoff.**
+- **Frozen interface (unchanged surface):** `CustomKmEngine.inverse` →
+  `solvePaletteConstrained`, same signature/exports. The palette may now span
+  media; the solver splits it and never returns a cross-medium recipe. The
+  per-group candidates are pooled before ranking, so `topK` and the out-of-gamut
+  verdict are still global over all media.
+- **Verification commands (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"`
+  first. `dart analyze`; `dart test`; coverage `bash tool/coverage_gate.sh <BASE>`;
+  acceptance default `dart test test/acceptance`.
+- **For SOLVER-6 (AC-17, in-gamut ≤5):** tighten the per-subset optimizer (the
+  `_gridSteps=12` simplex grid in `_bestRecipeForSubset`) so a reachable target
+  solves ≤ 5 ΔE00; record the swatch-set ΔE00 distribution as the validation
+  evidence noted against G-6 (G-6 governs confidence, not the solver logic). This
+  also closes the AC-17/AC-18 pairing (the in-gamut non-flag reject). The medium
+  partition and out-of-gamut gate stay as-is. Known gap still open: no perf cap
+  (SOLVER-7, exclusive lane).
 
 ## Phase 6 — SOLVER-6: in-gamut accuracy (AC-17)
 

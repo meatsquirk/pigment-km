@@ -61,6 +61,47 @@ void main() {
         expect(media.single, r.medium,
             reason: "the recipe's declared medium must match its paints' medium");
       }
+
+      // CONTROL (SOLVER-5 augmentation) — prove the solver genuinely searches
+      // EACH medium separately, not just the first one in the palette, and still
+      // never spans media. The target is the colour of a pure OIL paint; oil is
+      // SECOND in the palette, so a solver that searched only the first medium's
+      // paints (acrylic — white/blue/red, no yellow) could never reach it, while
+      // the correct partitioned solver searches the oil group too and returns
+      // that oil paint as the clear best. A cross-medium mixture cannot even be
+      // evaluated — the forward model refuses to span media — so the constraint
+      // is enforced at enumeration, which choosing an out-of-first-medium target
+      // exercises. Rejects a solver that searches only `palette.first.medium`.
+      const oilYellowId = 'oil.yellow_ochre';
+      final oilTarget = engine.forward(const {oilYellowId: 1.0});
+      final oilRecipes =
+          engine.inverse(oilTarget, palette, const MixOptions());
+
+      expect(oilRecipes, isNotEmpty);
+      for (final r in oilRecipes) {
+        final media = r.parts.keys.map((id) => idToMedium[id]).toSet();
+        expect(media, hasLength(1),
+            reason: 'recipe ${r.parts.keys.toList()} spans media $media');
+        expect(media.single, r.medium);
+      }
+      // The oil group WAS searched: its pure paint is the best recipe and sits
+      // on the target (ΔE00 ≈ 0), which no acrylic-only mixture can reach.
+      final best = oilRecipes.first;
+      expect(best.medium, Medium.oil,
+          reason: 'the best recipe for an oil target must come from the oil '
+              'group — so the solver searched past the first medium');
+      final bestDist = deltaE00(oilTarget.xyz, best.colour.xyz);
+      expect(bestDist, lessThan(1.0),
+          reason: 'the pure oil paint reaches its own colour');
+      // The temptation was real: the acrylic group alone lands strictly farther,
+      // so a first-medium-only solver would have returned a visibly worse match.
+      final acrylicOnly =
+          palette.where((p) => p.medium == Medium.acrylic).toList();
+      final acrylicBest =
+          engine.inverse(oilTarget, acrylicOnly, const MixOptions());
+      expect(deltaE00(oilTarget.xyz, acrylicBest.first.colour.xyz),
+          greaterThan(bestDist),
+          reason: 'acrylic alone cannot reach an oil target as well as oil can');
     }, skip: ac('AC-19'));
 
     test('AC-20 · TestAC20_Performance: the solver returns within the '

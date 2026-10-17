@@ -1,7 +1,7 @@
 # Master Plan — pigment_km: measured-pigment Kubelka–Munk mixing engine
 
 **Spec:** [pigment-km-engine.feature](../pigment-km-engine.feature)
-**Status:** In progress — behaviour stage: SOLVER-4 ✅ (honest out-of-gamut flag live; AC-18 ✅); next DATA-2 ∥ FORWARD-4 ∥ SOLVER-5 startable
+**Status:** In progress — behaviour stage: SOLVER-5 ✅ (per-medium partition live; AC-19 ✅); next DATA-2 ∥ FORWARD-4 ∥ SOLVER-6 startable
 **Architecture:** [Nuance/docs/custom-mixing-engine-design.md](../../../Nuance/docs/custom-mixing-engine-design.md) (physics §3, datasets §4, forward/inverse §6, tuning §7, staged plan §8, licensing §13) · [Nuance/docs/paint-color-app-solution-intent.md](../../../Nuance/docs/paint-color-app-solution-intent.md) (D3/D6/D7/D9, accuracy NFRs) · consumption contract: `Nuance/lib/recipes/engine/mixing_engine.dart` (bs-04)
 **Code home:** `/Users/matthew.quirk/pigment_km` · remote `https://github.com/meatsquirk/pigment-km` (origin, pushed) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
 
@@ -73,7 +73,7 @@ Greenfield — nothing exists yet; every AC is net-new. The gap is the whole lib
 | AC-16 | Recipes use only paints in the declared palette | ITEST-3 `TestAC16_PaletteOnly` | SOLVER-2 | ✅ |
 | AC-17 | An in-gamut target is matched within the recipe accuracy target | ITEST-3 `TestAC17_InGamut` | SOLVER-6 | ⬜ Todo |
 | AC-18 | An out-of-gamut target is flagged, never faked | ITEST-3 `TestAC18_OutOfGamut` | SOLVER-4 | ✅ |
-| AC-19 | A single recipe never spans media | ITEST-4 `TestAC19_CrossMedium` | SOLVER-5 | ⬜ Todo |
+| AC-19 | A single recipe never spans media | ITEST-4 `TestAC19_CrossMedium` | SOLVER-5 | ✅ |
 | AC-20 | The solver returns within the performance budget | ITEST-4 `TestAC20_Performance` | SOLVER-7 | ⬜ Todo |
 | AC-21 | The curated default palette cannot produce neon mixes | ITEST-4 `TestAC21_NoNeon` | TUNE-3 | ⬜ Todo |
 | AC-22 | The chroma penalty breaks ΔE00 ties toward the more muted recipe | ITEST-4 `TestAC22_ChromaPenalty` | TUNE-2 | ⬜ Todo |
@@ -163,7 +163,7 @@ Pre-seeded augmentations: AC-7/AC-11/AC-21 strengthened by DATA-5/DATA-7/TUNE-3 
 | KM | [modules/KM.md](modules/KM.md) | KM reflectance, Saunderson, two-constant mixing, concentration | CORE | ✅ Done (KM-2/3/4) |
 | DATA | [modules/DATA.md](modules/DATA.md) | Pigment data model, ingest, resample, NNLS/masstone-tint, build artifact, attribution | CORE, COLOR, KM | 🔄 In progress (DATA-1 ✅) |
 | FORWARD | [modules/FORWARD.md](modules/FORWARD.md) | `forward()` engine over measured pigments | COLOR, KM, DATA | 🔄 In progress (FORWARD-2 ✅) |
-| SOLVER | [modules/SOLVER.md](modules/SOLVER.md) | `inverse()` palette-constrained solver | FORWARD | 🔄 In progress (SOLVER-4 ✅) |
+| SOLVER | [modules/SOLVER.md](modules/SOLVER.md) | `inverse()` palette-constrained solver | FORWARD | 🔄 In progress (SOLVER-5 ✅) |
 | TUNE | [modules/TUNE.md](modules/TUNE.md) | Natural-colour tuning: curated palette, chromaPenalty, wet/dry | SOLVER, DATA | ⬜ Todo |
 | PROD | [modules/PROD.md](modules/PROD.md) | Provenance wiring, baseline engine + A/B, interface freeze | SOLVER | ⬜ Todo |
 | STRETCH | [modules/STRETCH.md](modules/STRETCH.md) | Finite-layer glazing, metamerism (optional, G-7) | FORWARD, COLOR | ⬜ Todo |
@@ -240,8 +240,8 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 | 23 | SOLVER-2 | AC-16 palette-only | ✅ Done | 9.98M | 17m 22s (1h 13m) | solver live; AC-16 un-pended, green; 7 A |
 | 24 | SOLVER-3 | AC-15 ranked / prefer fewer | ✅ Done | 14.65M | 26m 58s (3h 30m) | AC-15 un-pended, green; prefer-fewer-on-tie tie-break; 8 A (AC-15 B→A in-phase); fix 1/3 |
 | 25 | SOLVER-4 | AC-18 out-of-gamut | ✅ Done | 8.64M | 16m 37s (17m 34s) | AC-18 un-pended, green; target-level honest flag + verdict relabel; 9 A; fix 0/3 |
-| 26 | SOLVER-5 | AC-19 cross-medium | ⬜ Next | | | startable (∥ DATA-2, FORWARD-4) |
-| 27 | SOLVER-6 | AC-17 in-gamut ≤5 | ⬜ Todo | | | validation ↔ G-6 |
+| 26 | SOLVER-5 | AC-19 cross-medium | ✅ Done | 7.94M | 13m 46s | AC-19 un-pended & green; per-medium partition + pooled ranking; control proves each medium searched; 10 A; fix 0/3 |
+| 27 | SOLVER-6 | AC-17 in-gamut ≤5 | ⬜ Next | | | startable (∥ DATA-2, FORWARD-4); validation ↔ G-6 |
 | 28 | SOLVER-7 | AC-20 performance | ⬜ Todo | | | exclusive lane |
 | 29 | TUNE-2 | AC-22 chromaPenalty | ⬜ Todo | | | |
 | 30 | TUNE-3 | AC-21 curated palette | ⬜ Todo | | | real palette ↔ G-3 |
@@ -256,9 +256,9 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 
 ## Next phase
 
-**SOLVER-4 (honest out-of-gamut flag) ✅ done** — `lib/src/engine/inverse.dart`: out-of-gamut is a **target-level** verdict. After ranking + the topK cut, if `ranked.first.deltaE00 > opts.gamutThreshold` (default 5.0) no palette mixture can reach the target, so every returned recipe is re-stamped via `_flaggedOutOfGamut` — `outOfGamut:true` + verdict `"out of gamut — nearest ΔE00 X.XX"`, distance/parts/colour/provenance carried through (never a claimed match, SI intent). A reachable target (best ≤ ceiling) returns unflagged, so a weak in-top-K alternative isn't mislabelled. **Deviation from the prep note (improvement):** flag computed once on the best, not per-recipe (per-recipe would break the in-gamut control). AC-18 un-pended & green; TestAC18 augmented in-phase to also assert the relabelled verdict. analyze clean; `dart test` 133 pass/18 skip; acceptance default 17 pass/18 skip; cov inverse.dart 122/122. Grade **9 A** (AC-18 A; AC-1/2/3/4/5/14/15/16 re-confirmed). Fix passes 0/3.
+**SOLVER-5 (cross-medium rule) ✅ done** — `lib/src/engine/inverse.dart`: `solvePaletteConstrained` now partitions the palette by `Medium` and searches each medium's paints independently, then pools and ranks the groups' candidates. No recipe spans media (AC-19 / design §4.3); a single-medium palette collapses to one group = exactly the prior per-palette search, so AC-15 ranking and AC-18 out-of-gamut are unaffected. **Key finding:** the forward model refuses cross-medium mixes (throws), so a "cross-medium blend" target is physically inexpressible; the augmentation control instead targets a colour reachable only by the SECOND medium (oil), proving the solver searches each medium separately — not just `palette.first` — and still never spans. AC-19 un-pended & green; TestAC19 augmented in-phase (closes the ITEST-4 carry-forward control flag). analyze clean; `dart test` 136 pass/17 skip; acceptance default 18 pass/17 skip; cov inverse.dart 125/125. Grade **10 A** (AC-19 A; AC-1/2/3/4/5/14/15/16/18 re-confirmed). Fix passes 0/3.
 
-**Startable now (parallel, disjoint files):** **SOLVER-5** (AC-19 cross-medium — partition the palette by medium, search each, no recipe spans media; `inverse.dart` only) ∥ **DATA-2** (AC-8 resample, `data/resample.dart`) ∥ **FORWARD-4** (AC-13 desaturation — chroma(KM mix) < chroma(RGB blend), likely test-only over the live `forward`). Each in its own session (`--parallel` for concurrency). Merge risk: SOLVER-5 and FORWARD-4 both touch `lib/src/engine/*` — sequence them or watch the merge; DATA-2 is disjoint. SOLVER-5..7 is a chain (SOLVER-5 next in it); SOLVER-6 (AC-17) also closes the AC-17/AC-18 gamut pairing. FORWARD-3 (AC-12) stays gated on G-3/G-4. `⬜ Next` is marked on SOLVER-5 as the chain head; DATA-2/FORWARD-4 are equally startable.
+**Startable now (parallel, disjoint files):** **SOLVER-6** (AC-17 in-gamut ≤5 — tighten the per-subset optimizer; `inverse.dart` only; validation evidence ↔ G-6, which governs confidence not the solver logic) ∥ **DATA-2** (AC-8 resample, `data/resample.dart`) ∥ **FORWARD-4** (AC-13 desaturation — chroma(KM mix) < chroma(RGB blend), likely test-only over the live `forward`). Each in its own session (`--parallel` for concurrency). Merge risk: SOLVER-6 and FORWARD-4 both touch `lib/src/engine/*` — sequence them or watch the merge; DATA-2 is disjoint. SOLVER-6..7 is a chain (SOLVER-6 next in it); SOLVER-6 also closes the AC-17/AC-18 gamut pairing (the in-gamut non-flag reject). FORWARD-3 (AC-12) stays gated on G-3/G-4. `⬜ Next` is marked on SOLVER-6 as the chain head; DATA-2/FORWARD-4 are equally startable.
 
 Dataset gates G-3/G-4/G-5 block only the fidelity/real-palette ACs (AC-7/9/11/12/21); everything else runs on the synthetic fixture (D-7). G-6 adds held-out validation for AC-17; G-7 gates STRETCH. Routing (G-2): AC-23 = post-prediction state transform (TUNE-4).
 
@@ -288,7 +288,8 @@ Dataset gates G-3/G-4/G-5 block only the fidelity/real-palette ACs (AC-7/9/11/12
 | SOLVER-2 | d8949058 | 2026-10-16 18:11 EDT | 19:24 | 1h 13m | 17m 22s | claude-opus-4-8 | 168 | 256,010 | 9,662,102 | 61,298 | 9,979,578 | AC-16 palette-only un-pended, green; 7 A |
 | SOLVER-3 | f5bf67c0 | 2026-10-16 19:43 EDT | 23:13 | 3h 30m | 26m 58s | claude-opus-4-8 | 194 | 369,211 | 14,188,230 | 94,192 | 14,651,827 | AC-15 ranked/prefer-fewer-on-tie un-pended & green; 8 A (AC-15 B→A in-phase); analyze clean, default 130/19, acceptance 16/19, coverage inverse.dart 113/113; fix 1/3 |
 | SOLVER-4 | 3f5220a2 | 2026-10-17 04:35 EDT | 04:52 | 17m 34s | 16m 37s | claude-opus-4-8 | 158 | 234,333 | 8,353,412 | 53,482 | 8,641,385 | AC-18 un-pended & green; honest target-level out-of-gamut flag; 9 A; coverage 122/122; fix 0/3 |
-| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-17 04:52** | **10h 18m** | **4h 52m** |  | **2,316** | **3,792,995** | **130,696,474** | **1,023,020** | **135,514,805** |  |
+| SOLVER-5 | 5416ac89 | 2026-10-17 07:51 EDT | 08:04 | 13m 46s | 13m 46s | claude-opus-4-8 | 140 | 270,382 | 7,616,700 | 49,461 | 7,936,683 | AC-19 un-pended & green; per-medium partition; 10 A; fix 0/3 |
+| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-17 08:04** | **10h 31m** | **5h 06m** |  | **2,456** | **4,063,377** | **138,313,174** | **1,072,481** | **143,451,488** |  |
 
 ## Sign-off
 

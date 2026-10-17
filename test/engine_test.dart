@@ -254,6 +254,55 @@ void main() {
     });
   });
 
+  group('CustomKmEngine.inverse — cross-medium partition (SOLVER-5)', () {
+    const engine = CustomKmEngine();
+    final acrylic = PigmentTable.load(Medium.acrylic).pigments;
+    final oil = PigmentTable.load(Medium.oil).pigments;
+    final mixedPalette = <Pigment>[...acrylic, ...oil];
+    final idToMedium = <String, Medium>{
+      for (final p in mixedPalette) p.id: p.medium,
+    };
+
+    test('every recipe from a mixed-media palette uses one medium only', () {
+      // GIVEN a palette spanning both acrylic and oil paints — the partition
+      // must split it in two and search each group alone.
+      expect(mixedPalette.map((p) => p.medium).toSet(),
+          containsAll(<Medium>{Medium.acrylic, Medium.oil}));
+      const target =
+          ColourValue(srgb: (r: 0.5, g: 0.45, b: 0.4), xyz: (x: 0.2, y: 0.19, z: 0.14), oklch: (l: 0.5, c: 0.03, h: 60));
+
+      final recipes = engine.inverse(target, mixedPalette, const MixOptions());
+
+      // THEN no recipe spans media, and each recipe's declared medium matches
+      // its paints' medium (the group it was searched in).
+      expect(recipes, isNotEmpty);
+      for (final r in recipes) {
+        final media = r.parts.keys.map((id) => idToMedium[id]).toSet();
+        expect(media, hasLength(1), reason: '${r.parts.keys} spans $media');
+        expect(media.single, r.medium);
+      }
+    });
+
+    test('the non-first medium is searched, and its paint can win', () {
+      // GIVEN a mixed palette whose target is a pure OIL paint's colour (oil is
+      // second), so only searching the oil group can reach it. Rejects a solver
+      // that searches only `palette.first.medium` (acrylic).
+      const oilYellowId = 'oil.yellow_ochre';
+      final target = engine.forward(const {oilYellowId: 1.0});
+
+      final recipes = engine.inverse(target, mixedPalette, const MixOptions());
+
+      // THEN every recipe is single-medium, and the best is the oil paint that
+      // sits on the target — the oil group was genuinely searched.
+      expect(recipes, isNotEmpty);
+      for (final r in recipes) {
+        expect(r.parts.keys.map((id) => idToMedium[id]).toSet(), hasLength(1));
+      }
+      expect(recipes.first.medium, Medium.oil);
+      expect(recipes.first.deltaE00, lessThan(1.0));
+    });
+  });
+
   group('deltaE2000 colour difference (solver metric)', () {
     test('identical colours are ΔE00 0; XYZ wrapper agrees with Lab', () {
       expect(deltaE2000Lab(50, 10, -20, 50, 10, -20), closeTo(0, 1e-12));

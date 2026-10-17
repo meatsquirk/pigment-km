@@ -71,7 +71,7 @@ the public `Pigment(...)` constructor, `MixOptions`, `configForMedium`,
 | AC-27 | TestAC27_Metamerism (@stretch) | **B pending STRETCH-3** | Same sanctioned deferral behind G-7. Scope-gate precondition naming G-7; the multi-illuminant metamerism-index API not frozen until scope approval; the `illuminants` fixture (d65 + warm) is already staged, and the full scenario (incl. the single-illuminant reject) is documented for STRETCH-3. **Augmentation owned by STRETCH-3.** |
 
 ### Carry-forward flags for the owning phases
-- **AC-19 (SOLVER-5):** add a constructed cross-medium-tempting target as a control.
+- **AC-19 (SOLVER-5):** ✅ RESOLVED in the SOLVER-5 re-grade below — a second-medium-reachable control added (a true cross-medium-blend target is physically inexpressible: the forward model throws on any cross-medium mix).
 - **AC-21 (TUNE-3):** confirm/tune the real naturalistic chroma ceiling (harden), don't merely swap in the shipped palette.
 - **AC-22 (TUNE-2):** construct the guaranteed equal-ΔE00 2-vs-3-paint tie the test depends on, together with the un-pend (until then the test is over-constrained on `sawTie`).
 - **AC-23 (TUNE-4 / G-2):** resolve the forward-vs-inverse wet/dry interface so the best recipe is stable across wet/dry states.
@@ -263,3 +263,32 @@ through unchanged, so it cannot reorder, re-count or alter any neighbour's recip
 - **"honest ΔE00" asserted as `> 5` only,** not cross-checked against the independent yardstick `deltaE00(best.colour.xyz, target.xyz)`. Core intent (distance not understated) is covered; a yardstick cross-check (AC-18's own) would fully pin it — optional hardening.
 
 Result: 9 A.
+
+## Behaviour re-grade — SOLVER-5 (un-pended AC-19; re-confirmed AC-1, AC-2, AC-3, AC-4, AC-5, AC-14, AC-15, AC-16, AC-18) · graded 2026-10-17
+
+Grader: fresh independent adversarial subagent, G1–G6, given the prior grids and
+asked to justify any downgrade against a named rule. SOLVER-5's only lib change is
+`lib/src/engine/inverse.dart` (partition the palette by `Medium`, search each group
+independently, pool the candidates before the unchanged ranking/topK/out-of-gamut
+gate); the comparator, gamut gate and subset/simplex machinery are untouched
+(confirmed via `git diff`). Verified `dart analyze` clean; AC-19 passes default +
+run-pending; the full engine+acceptance suite passes. The grader confirmed the
+partition is behaviourally identical on single-medium palettes (one group = the
+prior per-palette search), so every re-confirmed AC either exercises code outside
+`inverse.dart` or runs on a single-medium palette. **Result: 10 A, 0 B, 0 fixes
+owed (passed first run, fix 0/3).**
+
+| AC | Test | Grade | Notes |
+|---|---|---|---|
+| AC-19 | TestAC19_CrossMedium (primary + control) | **A** | **Un-pended this phase.** Given checked through the public surface (`paletteMedia containsAll {acrylic, oil}`; palette via `PigmentTable.load`). Primary When via real `engine.inverse`; Then at grain — every recipe `media hasLength(1)` + `media.single == r.medium`, guarded by `recipes isNotEmpty`. **G5 rejects both wrong impls:** (1) the unpartitioned whole-palette solver — on the 6-paint mixed palette (maxPaints=4) it enumerates a size≥2 cross-medium subset and `forwardColour` THROWS (`forward.dart` cross-medium guard), so the When errors; this is exactly the pre-phase code, so AC-19 fails it by construction; (2) a `palette.first.medium`-only (acrylic) solver passes the primary but is caught by the **control**: `oilTarget = engine.forward({oil.yellow_ochre:1.0})` (oil is 2nd in the palette), and the control asserts `best.medium == Medium.oil`, `bestDist < 1.0` (the pure oil paint reproduces its own colour), and that acrylic-only lands strictly farther — a real temptation decisively failing a first-medium-only solver. Closes the ITEST-4 carry-forward control flag; honestly documents why a true cross-medium-blend target is impossible (forward refuses to span media). G6 clean. *Non-blocking note: the primary `media hasLength(1)` is near-tautological for any solver routed through the real forward (a cross-medium recipe can't be built without throwing); the genuine discrimination is the When-not-throwing + the control — both present, so A stands.* |
+| AC-1 | TestAC01_SpectrumToColour | A (re-confirmed) | COLOR pipeline not in inverse.dart's path. ΔE00 ≤ 1 to D65 white + Y≈1 + sRGB white. Unaffected by the partition. |
+| AC-2 | TestAC02_GamutMap | A (re-confirmed) | `gamut_map.dart`/`oklch.dart`/`colour_math.dart` untouched. Unclamped round-trip + consistency triple + L/hue preservation; rejects the disguised hard clip. |
+| AC-3 | TestAC03_KmRoundTrip | A (re-confirmed) | `km/reflectance.dart` untouched. R∞∈[0,1] rejects the +√ branch; K/S=0→R=1 anchor; round-trip 1e-5. |
+| AC-4 | TestAC04_Saunderson | A (re-confirmed) | `km/saunderson.dart` untouched. Full-formula `refMeasured` per bin both media + hand anchor (0.12727273) + distinctness controls; pins k2. |
+| AC-5 | TestAC05_TwoConstantMix | A (re-confirmed) | `forward.dart`/`km/mixing.dart` untouched. Relative-ΔE00 self-mix idempotence + order-independence + volume controls. |
+| AC-14 | TestAC14_Normalize | A (re-confirmed) | `normalizeParts` untouched. Σ=1, {2/3,1/3}, ratio preserved, ≠ raw 2.0, idempotent + different-ratio control. |
+| AC-15 | TestAC15_RankedPreferFewer (base + constructed tie) | A (re-confirmed) | Comparator `_byDeltaThenFewerPaints` unchanged. Both palettes are single-medium (synthPigments all acrylic; 6 twins all `Medium.acrylic`) → the partition yields one group = identical candidate set (still 56 subsets for the tie, C(6,1..4)) and identical ordering to pre-phase. Verified passing. Cannot be weakened by the partition. |
+| AC-16 | TestAC16_PaletteOnly | A (re-confirmed) | Single-medium acrylic palette → one group. Membership holds a fortiori under partition (each recipe drawn from one group ⊆ palette). Rejects a full-dataset-reaching solver. |
+| AC-18 | TestAC18_OutOfGamut | A (re-confirmed) | synthPigments (acrylic) + oogColour → single group; the gamut gate still keys on `ranked.first` (pooling cannot change `ranked.first` for a single-medium palette). `outOfGamut isTrue` + `deltaE00 > 5` + verdict "out of gamut". |
+
+Result: 10 A.
