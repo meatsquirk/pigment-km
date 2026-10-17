@@ -15,6 +15,7 @@ const Map<String, String> unpendedACs = <String, String>{
   'AC-4': 'KM-3',
   'AC-5': 'KM-4',
   'AC-14': 'FORWARD-2',
+  'AC-15': 'SOLVER-3',
   'AC-16': 'SOLVER-2',
 };
 

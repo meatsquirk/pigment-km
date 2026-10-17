@@ -1,6 +1,6 @@
 # Module SOLVER — the inverse solver
 
-**Status:** In progress — SOLVER-2 ✅ (palette-constrained search live; AC-16 ✅); next SOLVER-3
+**Status:** In progress — SOLVER-3 ✅ (ranked / prefer-fewer-on-tie live; AC-15 ✅); next SOLVER-4
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/engine/inverse.dart` (subset enumeration, per-subset optimizer, ranking, out-of-gamut, medium partition), `lib/src/engine/custom_km_engine.dart` (`inverse`)
 **Depends on:** FORWARD · **Blocks:** TUNE, PROD
@@ -10,7 +10,7 @@
 | Phase | Kind | Target AC | Status | Tokens | Time |
 |---|---|---|---|---|---|
 | 2 (SOLVER-2) | behavior | AC-16 | ✅ Done | 9.98M | 17m 22s (1h 13m) |
-| 3 (SOLVER-3) | behavior | AC-15 | ⬜ Todo | | |
+| 3 (SOLVER-3) | behavior | AC-15 | ✅ Done | 14.65M | 26m 58s (3h 30m) |
 | 4 (SOLVER-4) | behavior | AC-18 | ⬜ Todo | | |
 | 5 (SOLVER-5) | behavior | AC-19 | ⬜ Todo | | |
 | 6 (SOLVER-6) | behavior | AC-17 | ⬜ Todo (G-6 evidence) | | |
@@ -91,7 +91,64 @@ optimizer (SOLVER-6 tightens to ≤5 ΔE00); no perf cap (SOLVER-7).
 - **Exit criteria:** analyze clean; 100% touched; stable order; fewer-paint wins a tie.
 - **Acceptance gate:** un-pend AC-15; `TestAC15_RankedFewer` green.
 
-### Result · Checkpoint  <!-- filled on completion -->
+### Result · Checkpoint
+
+**Result (SOLVER-3 · AC-15).** The ranking in `lib/src/engine/inverse.dart` now
+runs a named comparator `_byDeltaThenFewerPaints`: best-first by ΔE00, and on an
+**exact** ΔE00 tie the recipe with fewer paints wins (`(deltaE00, parts.length)`
+lexicographic). The tie-break fires only on bit-equal ΔE00, so the ranking stays
+strictly ΔE00-monotonic (the base test's `recipes[i].deltaE00 >=
+recipes[i-1].deltaE00` holds) — it reorders only genuine ties, never near-misses.
+It runs **before** the `topK` truncation, so the simplest recipes survive the cut.
+AC-15 un-pended (deleted from `pending.dart`; added to `unpendedACs` in
+`pending_gate_test.dart`).
+- **Augmentation closed (TestAC15 → SOLVER-3):** added the constructed
+  guaranteed equal-ΔE00 tie to `TestAC15_RankedPreferFewer`. Six
+  identical-reflectance twin paints make every subset predict a **bit-identical**
+  colour (the two-constant sum narrows to the spectrum's Float32 precision in
+  `mixTwoConstant`, swamping the ~1e-16 accumulation error), so all C(6,1..4)=56
+  candidates tie EXACTLY on ΔE00. Six (not three) is deliberate: 56 candidates
+  exceed Dart `List.sort`'s 32-element insertion-sort threshold → the sort runs
+  the **unstable** quicksort, so only an explicit prefer-fewer key yields a
+  non-decreasing paint-count ranking. Verified the discrimination: reverting the
+  comparator to the pre-phase ΔE00-only `sort` makes both the acceptance and the
+  unit tie tests FAIL; restoring `_byDeltaThenFewerPaints` makes them pass. (The
+  first attempt used 3 twins / 7 candidates — the stable-sort regime, where a
+  no-tie-break solver passed too; the grade gate's fresh grader caught this as a
+  G5 / augmentation-non-discrimination B, fixed in-phase.)
+- **Verification (all green):** `dart analyze` → No issues · unit+acceptance
+  `dart test` → **130 passed / 19 skipped / 0 failed** (new SOLVER-3 unit group in
+  `engine_test.dart`: exact-tie fewer-first + topK-truncation-keeps-simplest) ·
+  acceptance default `dart test test/acceptance` → **16 passed / 19 skipped**
+  (AC-15 base + constructed-tie both live) · coverage gate (vs BASE `8fe6466`) →
+  **PASS** (`inverse.dart` 113/113 lines; +4 lines all the new comparator, both
+  arms covered — `byDelta != 0` by the distinct-paint solves, `== 0` by the twin
+  tie). Line-only metric (CORE deviation) as before.
+- **Grade gate:** fresh independent adversarial subagent, G1–G6, given the prior
+  grids → **8 A, 0 B** (AC-15 A; AC-1/2/3/4/5/14/16 re-confirmed A — SOLVER-3
+  touched no colour/km/forward/harness code, and AC-16's membership check is
+  order-independent under topK). Initial pass flagged AC-15 B (3-twin augmentation
+  did not discriminate); fixed and re-verified A. Grid: `behavior-test-completeness-pigment-km-engine.md` → *Behaviour re-grade — SOLVER-3*.
+- **Augmentations:** TestAC15 closed (above). None newly enabled for other ACs
+  (AC-22's tie-break is TUNE-2's own and uses a differing-chroma tie).
+- **Fix passes:** 1/3 (the AC-15 3-twin→6-twin discrimination fix). **Tokens /
+  time:** see dashboard.
+
+**Checkpoint / Handoff.**
+- **Frozen interface (unchanged surface):** `CustomKmEngine.inverse` →
+  `solvePaletteConstrained` still; ranking is now `(ΔE00 asc, paint count asc)` on
+  exact ties. No signature or export change. `_byDeltaThenFewerPaints` is private.
+- **Verification commands (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"`
+  first. `dart analyze`; `dart test`; coverage `bash tool/coverage_gate.sh <BASE>`;
+  acceptance default `dart test test/acceptance`.
+- **For SOLVER-4 (AC-18, out-of-gamut):** replace the `outOfGamut: false`
+  placeholder in `_bestRecipeForSubset` with the honest flag — when the best
+  achievable ΔE00 exceeds `MixOptions.gamutThreshold` (default 5.0), set
+  `outOfGamut true`, keep the true distance, never claim a match (SI fixed intent).
+  `TestAC18_OutOfGamut` (pending, owner SOLVER-4) already pins the control (pure
+  green unreachable → flagged + ΔE00 > 5) and AC-17 the in-gamut partner.
+  Known gaps still open: single-medium palette assumed (SOLVER-5); basic grid
+  optimizer, ΔE00 ≤ 5 accuracy (SOLVER-6); no perf cap (SOLVER-7).
 
 ## Phase 4 — SOLVER-4: out-of-gamut handling (AC-18)
 

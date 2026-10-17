@@ -8,14 +8,14 @@ import '../types/provenance.dart';
 import '../types/recipe.dart';
 import 'forward.dart';
 
-/// The inverse solver (design §6.2) — SOLVER-2: the palette-constrained search.
+/// The inverse solver (design §6.2) — SOLVER-2 the palette-constrained search,
+/// SOLVER-3 the ranking (best-first by ΔE00, preferring fewer paints on a tie).
 ///
 /// Given a [target] colour, the user's declared [palette] and the solve [opts],
 /// returns candidate mixing [Recipe]s drawn **only** from that palette. Later
-/// SOLVER phases build on this base: SOLVER-3 adds the prefer-fewer tie-break on
-/// top of the ΔE00 ordering here, SOLVER-4 the honest out-of-gamut flag, SOLVER-5
-/// the explicit per-medium partition, SOLVER-6 a tighter optimizer, SOLVER-7 the
-/// performance budget.
+/// SOLVER phases build on this base: SOLVER-4 the honest out-of-gamut flag,
+/// SOLVER-5 the explicit per-medium partition, SOLVER-6 a tighter optimizer,
+/// SOLVER-7 the performance budget.
 ///
 /// Every candidate is formed by enumerating subsets of the palette (size 1 up to
 /// [MixOptions.maxPaints], capped at the palette size) and fitting the volume
@@ -25,8 +25,10 @@ import 'forward.dart';
 /// partition and its guarantee are SOLVER-5's; here the recipe medium is the
 /// palette's medium.
 ///
-/// The returned list is ordered best-first by ΔE00 and truncated to
-/// [MixOptions.topK]. An empty [palette] yields no recipes.
+/// The returned list is ranked by [_byDeltaThenFewerPaints] — best-first by
+/// ΔE00, the simpler (fewer-paint) recipe first on an exact ΔE00 tie (AC-15) —
+/// and truncated to [MixOptions.topK] only after ranking, so the tie-break
+/// decides which recipes survive the cut. An empty [palette] yields no recipes.
 List<Recipe> solvePaletteConstrained(
   ColourValue target,
   List<Pigment> palette,
@@ -46,11 +48,31 @@ List<Recipe> solvePaletteConstrained(
       candidates.add(_bestRecipeForSubset(subset, target, medium, resolve));
     }
   }
-  candidates.sort((a, b) => a.deltaE00.compareTo(b.deltaE00));
+  candidates.sort(_byDeltaThenFewerPaints);
   if (candidates.length <= opts.topK) {
     return candidates;
   }
   return candidates.sublist(0, opts.topK);
+}
+
+/// Ranks two candidate recipes best-first: lower ΔE00 wins, and on an **exact**
+/// ΔE00 tie the recipe using fewer paints wins (AC-15 "prefer fewer paints").
+///
+/// The tie-break fires only when the two ΔE00 are bit-equal, so the ranking
+/// stays strictly monotonic in ΔE00 — two recipes with even minutely different
+/// distances are ordered by distance alone, never reshuffled by paint count. A
+/// genuine tie does occur: mixing identical-reflectance paints yields the same
+/// measured colour at any ratio (the two-constant sum narrows to the spectrum's
+/// Float32 precision in `mixTwoConstant`), so a 1-, 2- and 3-paint recipe can
+/// land on an identical ΔE00 — and the simplest is then preferred. Making the key
+/// explicit guarantees that order independently of the sort's stability and of
+/// the subset-enumeration order, rather than relying on either.
+int _byDeltaThenFewerPaints(Recipe a, Recipe b) {
+  final byDelta = a.deltaE00.compareTo(b.deltaE00);
+  if (byDelta != 0) {
+    return byDelta;
+  }
+  return a.parts.length.compareTo(b.parts.length);
 }
 
 /// The volume-fraction grid resolution: each paint's share is a multiple of

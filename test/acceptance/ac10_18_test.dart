@@ -316,6 +316,103 @@ void main() {
       }
     }, skip: ac('AC-15'));
 
+    test('AC-15 · TestAC15_RankedPreferFewer (constructed tie): on a guaranteed '
+        'equal-ΔE00 tie the fewer-paint recipe ranks first', () {
+      // SOLVER-3 augmentation (ITEST *Test augmentations* row TestAC15). The base
+      // test's fewer-paint-on-tie Then only fires on a natural adjacent tie the
+      // solve may not produce; this case GUARANTEES a tie and asserts the rule
+      // decisively — it FAILS against a solver with no explicit prefer-fewer
+      // tie-break (see the discrimination note below).
+      final engine = customEngine();
+      // GIVEN a declared palette of six paints with IDENTICAL reflectance: same
+      // K and same S spectra, differing only in id. Mixing identical-reflectance
+      // paints yields that same measured colour at any ratio and any paint count
+      // (the two-constant sum narrows to the spectrum's Float32 precision), so
+      // every subset predicts the SAME colour and therefore a bit-identical ΔE00
+      // to any target — a guaranteed EXACT tie across recipes of 1…4 paints.
+      //
+      // Six paints (not three) is deliberate and is what makes this DISCRIMINATE
+      // the tie-break from its absence. The solver enumerates subsets fewer-first
+      // and then sorts; with ≤ 7 candidates Dart's List.sort is a *stable*
+      // insertion sort, so even a no-tie-break ΔE00-only sort would leave the
+      // fewer-first enumeration order intact and spuriously pass. Six paints give
+      // C(6,1..4) = 56 candidates (maxPaints defaults to 4), above Dart's
+      // insertion-sort threshold, so the sort runs the *unstable* quicksort:
+      // among the 56 bit-equal-ΔE00 candidates only an explicit prefer-fewer
+      // secondary key yields a non-decreasing paint-count ranking. A ΔE00-only
+      // sort reshuffles them (a heavier recipe surfaces before a lighter one),
+      // failing the assertions below.
+      final sharedK = _bump(peakBin: 12, floor: 0.08, height: 0.6);
+      final sharedS = _flat(0.5);
+      Pigment twin(String id) => Pigment(
+            id: id,
+            name: id,
+            pigmentIndex: 'PW6',
+            medium: Medium.acrylic,
+            k: sharedK,
+            s: sharedS,
+            opacity: 0.5,
+            provenance: Provenance.estimated,
+            sourceRef: 'synthetic:ac15-tie-$id',
+          );
+      final palette = [
+        for (final id in ['one', 'two', 'three', 'four', 'five', 'six'])
+          twin(id),
+      ];
+      final paletteIds = palette.map((p) => p.id).toSet();
+      // Check the Given: six genuinely distinct ids, all carrying the same K and
+      // S, so no ΔE00 ordering can separate their mixes.
+      expect(paletteIds, hasLength(6));
+      expect(palette.every((p) => spectraEqual(p.k, sharedK)), isTrue);
+      expect(palette.every((p) => spectraEqual(p.s, sharedS)), isTrue);
+      // An arbitrary target — the tie holds for ANY target because the predicted
+      // colours are bit-identical; the exact target colour is immaterial.
+      final target = colourFromSrgb((r: 0.42, g: 0.55, b: 0.37));
+      // topK large enough to admit every subset, so the full ranking is visible.
+      const opts = MixOptions(topK: 100);
+
+      // WHEN the solver searches for recipes.
+      final recipes = engine.inverse(target, palette, opts);
+
+      // THEN all 56 subsets come back (C(6,1)+…+C(6,4)), each parts-by-volume
+      // summing to 1 and drawn only from the palette …
+      expect(recipes, hasLength(56));
+      expect(recipes.length, lessThanOrEqualTo(opts.topK));
+      for (final r in recipes) {
+        expect(r.parts.values.fold<double>(0, (a, b) => a + b),
+            closeTo(1.0, 1e-6));
+        expect(r.parts.keys, everyElement(isIn(paletteIds)));
+      }
+      // … the tie is genuine and EXACT: every recipe's ΔE00 is bit-identical, so
+      // ΔE00 carries zero ordering information — the entire ordering is the
+      // tie-break's doing (rejects a solver that treats this as a near-miss
+      // rather than a true tie).
+      final tiedDelta = recipes.first.deltaE00;
+      for (final r in recipes) {
+        expect(r.deltaE00, equals(tiedDelta),
+            reason: 'identical-reflectance mixes must tie exactly on ΔE00');
+      }
+      // … and the ranking is strictly non-decreasing in paint count: all the
+      // 1-paint recipes, then 2-paint, then 3-paint, then 4-paint. This REJECTS
+      // the wrong-direction tie-break (prefer MORE paints → counts.first == 4)
+      // AND — because 56 candidates trip the unstable sort — a solver with no
+      // prefer-fewer tie-break at all (it would surface a heavier recipe first).
+      final counts = [for (final r in recipes) r.parts.length];
+      expect(counts.first, 1, reason: 'the simplest recipe must rank first');
+      expect(counts.last, 4, reason: 'the most complex recipe must rank last');
+      for (var i = 1; i < recipes.length; i++) {
+        expect(counts[i], greaterThanOrEqualTo(counts[i - 1]),
+            reason: 'on an exact ΔE00 tie fewer paints must rank first, so paint '
+                'count is non-decreasing down the ranking');
+      }
+      // Pin the decisive 2-vs-3 pair the row calls for: every 2-paint recipe
+      // outranks every (tied) 3-paint recipe.
+      final firstThreePaint = recipes.indexWhere((r) => r.parts.length == 3);
+      final lastTwoPaint = recipes.lastIndexWhere((r) => r.parts.length == 2);
+      expect(lastTwoPaint, lessThan(firstThreePaint),
+          reason: 'a 2-paint recipe must outrank the tied 3-paint recipe');
+    }, skip: ac('AC-15'));
+
     test('AC-16 · TestAC16_PaletteOnly: recipes use only paints in the declared '
         'palette', () {
       final engine = customEngine();

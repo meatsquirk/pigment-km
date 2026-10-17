@@ -205,3 +205,32 @@ per-id membership loop fails it. **Result: 7 A.**
 | AC-14 | TestAC14_Normalize | A (re-confirmed) | `normalizeParts` (`forward.dart`) untouched. Asserts the public `normalizeParts` observably (Σ=1, {2/3,1/3}, ratio preserved, ≠ raw 2.0, idempotent) — rejects the identity/non-normalizing impl the scale-invariant colour surface cannot — with scale-invariance kept as a labelled consistency property + a different-ratio control. Green at baseline. |
 
 Result: 7 A.
+
+## Behaviour re-grade — SOLVER-3 (un-pended AC-15; re-confirmed AC-1, AC-2, AC-3, AC-4, AC-5, AC-14, AC-16) · graded 2026-10-16
+
+Grader: fresh independent adversarial subagent, G1–G6; given all prior grids and
+asked to justify any downgrade against a named rule, and to rule explicitly on the
+constructed-tie augmentation's discrimination. SOLVER-3's only lib change is
+`lib/src/engine/inverse.dart` (the `_byDeltaThenFewerPaints` comparator + the sort
+swap); no colour/km/forward/harness file touched. Initial pass: **7 A, 1 B (AC-15)**
+— the first constructed-tie used 3 twins (7 candidates → Dart's *stable*
+insertion-sort regime), so a no-tie-break ΔE00-only sort passed it too: the
+augmentation did not discriminate (G5 / augmentation-discrimination rule). Fixed
+in-phase (fix pass 1/3): raised to 6 twins → 56 bit-equal-ΔE00 candidates (above
+Dart's 32-elem threshold → unstable quicksort), where only an explicit prefer-fewer
+key yields a non-decreasing paint-count ranking. Discrimination verified by
+reverting the comparator (both the acceptance and unit tie tests fail; restored →
+pass). **Final: 8 A.**
+
+| AC | Test | Grade | Notes |
+|---|---|---|---|
+| AC-15 | TestAC15_RankedPreferFewer (base + constructed tie) | **A** | **Un-pended this phase; B→A in-phase.** Base test non-vacuous (≥2 recipes; best-first ΔE00 monotonicity; membership; Σ1). Constructed-tie case: 6 identical-reflectance twins → 56 subsets each predicting a **bit-identical** colour (Float32-narrowing in `mixTwoConstant` swamps the ~1e-16 accumulation error → all ΔE00 `equals(tiedDelta)`), a genuine EXACT tie across 1…4-paint recipes. 56 > Dart's 32-elem insertion-sort threshold → unstable quicksort, so the non-decreasing paint-count ranking (`counts.first==1`, `counts.last==4`, monotone, last-2-paint before first-3-paint) **requires** the explicit prefer-fewer key — verified it FAILS the pre-phase ΔE00-only `sort` and passes `_byDeltaThenFewerPaints`. Rejects both the reversed (prefer-more) tie-break (`counts.last==4`) and the no-tie-break solver (unstable-sort reshuffle). One AC per test (G6). |
+| AC-1 | TestAC01_SpectrumToColour | A (re-confirmed) | COLOR pipeline untouched by SOLVER-3. ΔE00 ≤ 1 to the D65 white point + Y≈1 + sRGB white; rejects dropped `yBarD65Sum`/mis-weighted illuminant. Unchanged single-white G5-floor flag. |
+| AC-2 | TestAC02_GamutMap | A (re-confirmed) | `gamut_map.dart`/`oklch.dart` untouched. Unclamped `oklchToLinearSrgb(mapped.oklch)` ∈ [−1e-6, 1+1e-6] + consistency triple + L/hue preservation; rejects the disguised hard-clip. |
+| AC-3 | TestAC03_KmRoundTrip | A (re-confirmed) | `km/reflectance.dart` untouched. R∞∈[0,1] rejects the +√ branch; K/S=0→R=1 anchor; round-trip 1e-5 rejects a dropped f(R) constant. |
+| AC-4 | TestAC04_Saunderson | A (re-confirmed) | `km/saunderson.dart` untouched. Independent full-formula `refMeasured` per bin both media + hand anchor + distinctness controls; pins k2. |
+| AC-5 | TestAC05_TwoConstantMix | A (re-confirmed) | `forward.dart`/`km/mixing.dart` untouched. Relative-ΔE00 self-mix idempotence + order-independence + volume controls. |
+| AC-14 | TestAC14_Normalize | A (re-confirmed) | `normalizeParts` untouched. Σ=1, {2/3,1/3}, ratio preserved, ≠ raw 2.0, idempotent + different-ratio control. |
+| AC-16 | TestAC16_PaletteOnly | A (re-confirmed) | inverse.dart's ranking changed, but AC-16 asserts only order-independent per-id membership with `recipes isNotEmpty`; the 2-paint palette yields 3 recipes ≤ topK (no truncation), so the comparator change cannot affect it. Rejects a full-dataset-reaching solver. |
+
+Result: 8 A.

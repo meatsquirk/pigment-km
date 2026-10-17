@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:pigment_km/pigment_km.dart';
 import 'package:test/test.dart';
@@ -120,6 +121,73 @@ void main() {
       expect(calcRecipes, isNotEmpty);
       expect(calcRecipes, everyElement(predicate<Recipe>(
           (r) => r.provenance == Provenance.calculated)));
+    });
+  });
+
+  group('CustomKmEngine.inverse — ranking / prefer fewer paints (SOLVER-3)', () {
+    const engine = CustomKmEngine();
+
+    // Six identical-reflectance paints (same K, same S): every mixture predicts
+    // the same measured colour at any ratio and any paint count — the two-
+    // constant sum narrows to the spectrum's Float32 precision — so all subsets
+    // tie EXACTLY on ΔE00. C(6,1..4) = 56 candidates (maxPaints defaults to 4) is
+    // above Dart's 32-element insertion-sort threshold, so List.sort runs the
+    // *unstable* quicksort: only the explicit prefer-fewer secondary key makes
+    // the paint-count ranking non-decreasing (a ΔE00-only sort reshuffles the
+    // bit-equal candidates). This both covers the byDelta == 0 branch and proves
+    // the tie-break changes behaviour.
+    final k = Float32List.fromList(
+        [for (var i = 0; i < CanonicalGrid.bins; i++) 0.07 + 0.015 * i]);
+    final s =
+        Float32List.fromList(List<double>.filled(CanonicalGrid.bins, 0.4));
+    Pigment twin(String id) => Pigment(
+          id: id,
+          name: id,
+          pigmentIndex: 'PX',
+          medium: Medium.acrylic,
+          k: k,
+          s: s,
+          opacity: 0.5,
+          provenance: Provenance.estimated,
+          sourceRef: 'synthetic:$id',
+        );
+    final twins = [
+      for (final id in ['a', 'b', 'c', 'd', 'e', 'f']) twin(id),
+    ];
+    const target = ColourValue(
+      srgb: (r: 0.5, g: 0.5, b: 0.5),
+      xyz: (x: 0.2, y: 0.2, z: 0.2),
+      oklch: (l: 0.5, c: 0.0, h: 0.0),
+    );
+
+    test('on an exact ΔE00 tie the fewer-paint recipe ranks first', () {
+      final recipes =
+          engine.inverse(target, twins, const MixOptions(topK: 100));
+
+      expect(recipes, hasLength(56));
+      final tied = recipes.first.deltaE00;
+      expect(recipes, everyElement(predicate<Recipe>((r) => r.deltaE00 == tied)),
+          reason: 'identical-reflectance mixes tie exactly on ΔE00');
+      final counts = [for (final r in recipes) r.parts.length];
+      expect(counts.first, 1);
+      expect(counts.last, 4);
+      for (var i = 1; i < counts.length; i++) {
+        expect(counts[i], greaterThanOrEqualTo(counts[i - 1]),
+            reason: 'paint count is non-decreasing down the ranking on a tie');
+      }
+    });
+
+    test('truncation to topK keeps the tie-break winners (fewer paints survive '
+        'the cut)', () {
+      // topK < the number of subsets: because the tie-break runs BEFORE
+      // truncation, the survivors are the simplest recipes, not an arbitrary
+      // slice of equal-ΔE00 candidates.
+      final recipes = engine.inverse(target, twins, const MixOptions(topK: 6));
+      expect(recipes, hasLength(6));
+      // The six survivors are exactly the single-paint recipes.
+      expect(recipes, everyElement(predicate<Recipe>((r) => r.parts.length == 1)),
+          reason: 'the simplest recipes outrank equal-ΔE00 heavier ones and so '
+              'survive the topK cut');
     });
   });
 
