@@ -51,7 +51,7 @@ else
     { [[ -n "$BASE" ]] && git diff --name-only "$BASE" -- lib || true
       git ls-files --others --exclude-standard -- lib; } | sort -u
   )
-  for f in "${changed[@]}"; do is_source "$f" && FILES+=("$f"); done
+  for f in ${changed[@]+"${changed[@]}"}; do is_source "$f" && FILES+=("$f"); done
 fi
 
 run_coverage

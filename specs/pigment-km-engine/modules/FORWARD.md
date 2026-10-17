@@ -1,6 +1,6 @@
 # Module FORWARD — the forward engine
 
-**Status:** In progress — FORWARD-2 ✅ done; FORWARD-4 startable now, FORWARD-3 gated (G-3/G-4)
+**Status:** In progress — FORWARD-2 ✅, FORWARD-4 ✅ (AC-13); only FORWARD-3 left, gated on G-3/G-4 (real measured mixtures)
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/engine/custom_km_engine.dart` (`forward`, `reflectanceOf`), `lib/src/engine/forward.dart`
 **Depends on:** COLOR, KM, DATA · **Blocks:** SOLVER, STRETCH
@@ -11,7 +11,7 @@
 |---|---|---|---|---|---|
 | 2 (FORWARD-2) | behavior | AC-14, AC-5 | ✅ Done | 11.23M | 17m 53s (39m 37s) |
 | 3 (FORWARD-3) | behavior | AC-12 | ⬜ Todo (G-3/G-4) | | |
-| 4 (FORWARD-4) | behavior | AC-13 | ⬜ Todo | | |
+| 4 (FORWARD-4) | behavior | AC-13 | ✅ Done | 4.82M | 9m 00s (9m 00s) |
 
 ## Interface reconciliation
 
@@ -123,4 +123,63 @@ stays a SOLVER stub.
 - **Exit criteria:** analyze clean; 100% touched; property holds on synthetic and (post-data) real pigments.
 - **Acceptance gate:** un-pend AC-13; `TestAC13_Desaturation` green.
 
-### Result · Checkpoint  <!-- filled on completion -->
+### Result
+
+**No production code needed — green at baseline.** The natural-desaturation property
+was already satisfied by the live `forward` pipeline (FORWARD-2) over the
+hue-faithful fixture (DATA-8): KM two-constant mixing is subtractive, so an
+equal-volume mix of two chromatic paints greys out where a naive per-channel sRGB
+midpoint stays vibrant. FORWARD-4 is therefore the sanctioned *green-at-baseline*
+un-pend (acceptance-suite.md § *Red baseline*): the behaviour phase still runs to
+un-pend AC-13, keep it green and re-grade. The pre-written `TestAC13_Desaturation`
+(ITEST-3) already discriminates against an RGB-space-blending engine; checked and
+found strong (see grade gate), so no strengthening was owed.
+
+- **Measured property (throwaway probe, not committed):** `kmMix.oklch.c = 0.01618`
+  vs naive sRGB-midpoint `rgbBlendChroma = 0.04849` — gap **0.0323**, ratio **0.334**
+  (≈3× desaturation). Pure paints post-DATA-8: phthalo_blue c=0.092 h≈275°,
+  naphthol_red c=0.078 h≈28°, Δh≈113°; both Givens hold with wide margin.
+- **Un-pend:** deleted `AC-13` from `pendingACs` (`pending.dart`); added
+  `AC-13: FORWARD-4` to `unpendedACs` (`pending_gate_test.dart`). No engine stub to
+  remove (`forward` live since FORWARD-2). The 27↔27 bijection holds (11 un-pended,
+  16 pending).
+- **Gates (all green):** `dart analyze` clean; full unit `dart test` **+137 ~16**,
+  0 fail; acceptance default **+19 ~16** (AC-13 now executes live, no longer skipped);
+  run-pending red baseline **+22 −13** — the 13 failing are exactly the still-pending
+  later-phase ACs (AC-7/8/9/10/11/12/21/22/23/24/25/26/27), each on its
+  Then/precondition; AC-13 passes. Coverage gate: no `lib/` file touched →
+  *no touched library files — OK* (and the populated path still passes, forward.dart
+  28/28).
+- **Grade gate:** fresh independent adversarial subagent re-graded **all 11**
+  un-pended AC tests (AC-1/2/3/4/5/13/14/15/16/18/19) → **11 A, 0 B, 0 fixes owed**.
+  AC-13 confirmed genuinely A: the prior standing "strict `<`" flag is now quantified
+  and discharged (3× gap, noise-free; library `linearSrgbToOklch` shares byte-identical
+  Ottosson constants with the harness, so an sRGB-midpoint engine lands exactly on the
+  boundary and fails the strict `<`). The other 10 run byte-identical code/fixture and
+  re-confirm their DATA-8 A grades. Grid: `behavior-test-completeness-pigment-km-engine.md`.
+- **Augmentations:** none assigned to FORWARD-4; no already-green neighbour can assert
+  more from this test-only un-pend (G6).
+- **Tooling fix:** `tool/coverage_gate.sh` had a latent `set -u` bug — iterating
+  `"${changed[@]}"` errors on an empty array (any phase touching no `lib/` file, like
+  this one), never reaching its own "no touched library files — OK" path. Fixed with
+  the empty-array-safe expansion `${changed[@]+"${changed[@]}"}`; the populated path
+  is unchanged (verified: `--files lib/src/engine/forward.dart` → 28/28 PASS).
+- Tokens: 4.82M · Time: 9m 00s active (9m 00s wall) — see ledger.
+
+### Checkpoint / Handoff
+
+- **Frozen interface:** unchanged from FORWARD-2 — `CustomKmEngine().forward(mix)` →
+  `ColourValue`, `.reflectanceOf(mix)` → measured `Spectrum`, public
+  `normalizeParts(mix)`. FORWARD-4 added no surface.
+- **Verification commands (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"`
+  first. `dart analyze`; unit `dart test`; coverage `bash tool/coverage_gate.sh <BASE>`
+  (line-only; now empty-array-safe); acceptance default `dart test test/acceptance`;
+  run-pending `PIGMENT_KM_RUN_PENDING=true dart test test/acceptance`. Un-pend = delete
+  the AC row in `pending.dart` **and** add it to `unpendedACs` in `pending_gate_test.dart`.
+- **Known gaps:** none for AC-13 on synthetic pigments (behaviour complete). The
+  exit criterion's "post-data real pigments" clause folds into FORWARD-3's real
+  measured-mixture validation (G-3/G-4) — the desaturation property is physical to KM
+  mixing, so it will hold on real K/S too; no separate AC-13 augmentation is owed.
+- **Next phases off FORWARD-4:** **STRETCH-2** (AC-26 glazing) lists FORWARD-4 as a
+  dependency but remains gated on **G-7** (STRETCH scope). FORWARD module now has only
+  **FORWARD-3** (AC-12) left, gated on **G-3/G-4** (real measured mixtures).

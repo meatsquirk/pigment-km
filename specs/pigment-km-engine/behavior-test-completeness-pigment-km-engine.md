@@ -323,3 +323,30 @@ passed, 17 pending skipped). **Result: 10 A, 0 downgrades, 0 fixes owed.**
 Note: AC-17 (cool-blue in-gamut) remains **pending** (owner SOLVER-6) so it is
 outside this un-pended re-grade; DATA-8 only makes its target reachable
 (ΔE00 3.69 via white 0.917 + phthalo_blue 0.083, recorded for SOLVER-6).
+
+## Behaviour re-grade — FORWARD-4 (un-pended AC-13; re-confirmed AC-1,2,3,4,5,14,15,16,18,19) · graded 2026-10-17
+
+Grader: fresh independent adversarial subagent, G1–G6; given all prior grids and
+asked to justify any downgrade against a named rule. FORWARD-4's only change is the
+pending-gate rows (AC-13 moved from `pendingACs` to `unpendedACs`) plus an
+empty-array-safety one-liner in `tool/coverage_gate.sh`; no `lib/` production code,
+no acceptance-test body, no fixture touched (verified via `git diff HEAD`). AC-13's
+forward engine was already live since FORWARD-2, so the test now simply runs.
+`dart test test/acceptance` green (+19 ~16). AC-13's chroma gap measured by a
+throwaway scratchpad probe. **Result: 11 A, 0 B, 0 fixes owed.**
+
+| AC | Test | Grade | Notes |
+|---|---|---|---|
+| AC-13 | TestAC13_Desaturation | **A** | **Un-pended this phase; genuinely A.** Both Givens via public `forward` before the When (pureBlue c=0.092, pureRed c=0.078 both >0.04; Δh=113°>20°). Then `kmMix.oklch.c (0.01618) < srgbToOklch(sRGB-midpoint).c (0.04849)` — gap 0.0323, ratio 0.334 (≈3× desaturation), neither near zero → strict `<` non-vacuous and noise-free. **Rejects the RGB-space-blending engine**: library `linearSrgbToOklch` shares byte-identical Ottosson constants with the harness, so an sRGB-midpoint impl lands at exactly `rgbBlendChroma` → strict `<` false → fails; a collapse-to-component impl reports higher chroma → also fails. G6 clean (asserts only desaturation). Prior strict-`<` flag now quantified and discharged. |
+| AC-1 | TestAC01_SpectrumToColour | A (re-confirmed) | COLOR pipeline not touched by FORWARD-4. ΔE00 ≤ 1 to D65 white point + Y≈1 + sRGB white; rejects dropped `yBarD65Sum`/mis-weighted illuminant. Unchanged single-white G5-floor flag. |
+| AC-2 | TestAC02_GamutMap | A (re-confirmed) | `gamut_map.dart`/`oklch.dart`/`colour_math.dart` untouched. Unclamped `oklchToLinearSrgb(mapped.oklch)` ∈ [−1e-6,1+1e-6] + consistency triple + L/hue preservation; rejects the disguised hard-clip-just-above-boundary. |
+| AC-3 | TestAC03_KmRoundTrip | A (re-confirmed) | `km/reflectance.dart` untouched. R∞∈[0,1] per bin rejects the +√ branch; K/S=0→R=1 anchor; round-trip 1e-5. |
+| AC-4 | TestAC04_Saunderson | A (re-confirmed) | `km/saunderson.dart` untouched. Full-formula `refMeasured` per bin for both media + hand anchor (0.12727273) + distinctness controls; pins the k2 term. G-5 constant-lockstep flag unchanged. |
+| AC-5 | TestAC05_TwoConstantMix | A (re-confirmed) | `forward.dart`/`km/mixing.dart` untouched. Relative-ΔE00 self-mix idempotence (0.3≡0.9≡pure) + order-independence (ab≡ba) + volume controls (mix≠pures; 25/75≠75/25≠50/50). |
+| AC-14 | TestAC14_Normalize | A (re-confirmed) | `normalizeParts` untouched. Σ=1, {2/3,1/3}, 2:1 ratio preserved, ≠ raw 2.0, idempotent — rejects the identity/non-normalizing impl the scale-invariant colour surface cannot — plus a different-ratio control. |
+| AC-15 | TestAC15_RankedPreferFewer (base + constructed tie) | A (re-confirmed) | Comparator `_byDeltaThenFewerPaints` untouched. Base: ≥2 recipes, best-first ΔE00 monotonic, membership, Σ1. Constructed tie: 6 identical-reflectance twins → 56 bit-equal-ΔE00 subsets > Dart's 32-elem threshold → unstable quicksort, so non-decreasing paint-count ranking requires the explicit prefer-fewer key. Fixture-independent twins. |
+| AC-16 | TestAC16_PaletteOnly | A (re-confirmed) | inverse.dart untouched. Palette excludes `naphthol_red` (asserted absent) against a reddish target; every recipe paint ∈ palette. Post-DATA-8 the red renders red (h≈28°) so the temptation is genuine → dataset-reaching reject fires hard. |
+| AC-18 | TestAC18_OutOfGamut | A (re-confirmed) | inverse.dart gamut gate untouched. Green (c>0.2, no green primary) → `outOfGamut isTrue` + `deltaE00 > 5` (best ≈32.40) + verdict contains "out of gamut". Rejects the nearest-mix-unflagged false recipe. |
+| AC-19 | TestAC19_CrossMedium (primary + control) | A (re-confirmed) | inverse.dart partition untouched. Primary: every recipe `media hasLength(1)` + `media.single==r.medium` (a cross-medium subset throws in the forward guard). Control: oil-yellow target (oil 2nd in palette) → `best.medium==oil`, bestDist<1.0, acrylic-only lands farther → rejects a first-medium-only solver. |
+
+Result: 11 A.

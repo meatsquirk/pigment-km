@@ -1,7 +1,7 @@
 # Master Plan — pigment_km: measured-pigment Kubelka–Munk mixing engine
 
 **Spec:** [pigment-km-engine.feature](../pigment-km-engine.feature)
-**Status:** In progress — DATA-8 ✅ 2026-10-17 (synthetic fixture now hue-faithful; AC-17 cool-blue reachable ΔE00 3.69, AC-18 oog holds, re-grade 10 A); next startable FORWARD-4 ∥ DATA-2. SOLVER-6 dependency drift to reconcile (SOLVER.md still lists FORWARD-3)
+**Status:** In progress — FORWARD-4 ✅ 2026-10-17 (AC-13 un-pended, green; 11 A re-grade, 0 fixes; 11 ACs un-pended / 16 pending). Next startable: DATA-2, SOLVER-6 (disjoint). SOLVER-6 dependency drift still to reconcile (SOLVER.md lists stale FORWARD-3 dep)
 **Architecture:** [Nuance/docs/custom-mixing-engine-design.md](../../../Nuance/docs/custom-mixing-engine-design.md) (physics §3, datasets §4, forward/inverse §6, tuning §7, staged plan §8, licensing §13) · [Nuance/docs/paint-color-app-solution-intent.md](../../../Nuance/docs/paint-color-app-solution-intent.md) (D3/D6/D7/D9, accuracy NFRs) · consumption contract: `Nuance/lib/recipes/engine/mixing_engine.dart` (bs-04)
 **Code home:** `/Users/matthew.quirk/pigment_km` · remote `https://github.com/meatsquirk/pigment-km` (origin, pushed) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
 
@@ -67,7 +67,7 @@ Greenfield — nothing exists yet; every AC is net-new. The gap is the whole lib
 | AC-10 | K and S are derived from a masstone and tint series | ITEST-3 `TestAC10_MasstoneTint` | DATA-4 | ⬜ Todo |
 | AC-11 | Shipped data carries its licence attribution and correct provenance | ITEST-3 `TestAC11_Attribution` | DATA-7 | ⬜ Todo |
 | AC-12 | The forward model predicts a known mixture's colour | ITEST-3 `TestAC12_ForwardFidelity` | FORWARD-3 | ⬜ Todo |
-| AC-13 | Mixing two real pigments desaturates the way real paint does | ITEST-3 `TestAC13_Desaturation` | FORWARD-4 | ⬜ Todo |
+| AC-13 | Mixing two real pigments desaturates the way real paint does | ITEST-3 `TestAC13_Desaturation` | FORWARD-4 | ✅ Done |
 | AC-14 | Volumes are normalized before mixing | ITEST-3 `TestAC14_Normalize` | FORWARD-2 | ✅ |
 | AC-15 | The inverse solver returns ranked recipes preferring fewer paints | ITEST-3 `TestAC15_RankedPreferFewer` | SOLVER-3 | ✅ |
 | AC-16 | Recipes use only paints in the declared palette | ITEST-3 `TestAC16_PaletteOnly` | SOLVER-2 | ✅ |
@@ -233,8 +233,8 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 | 13 | KM-4 | two-constant mixing (enabler; AC-5 un-pends in FORWARD-2) | ✅ Done | 3.94M | 7m 52s (8m 09s) | `mixTwoConstant` Σv·K/Σv·S (no normalise); cov 16/16; enabler — no un-pend; KM module ✅ |
 | 14 | FORWARD-2 | AC-14 normalize + AC-5 un-pend (enabler for forward) | ✅ Done | 11.23M | 17m 53s (39m 37s) | forward pipeline (normalize→mix→KM→Saunderson→colour) + reflectanceOf; AC-5 + AC-14 un-pended, green; cov forward 28/28, engine 11/11; grade 5 A (AC-14 B→A in-phase, fix 1/3); exposed `normalizeParts` |
 | 15 | FORWARD-3 | AC-12 forward fidelity | ⬜ Todo | | | needs G-3/G-4 |
-| 16 | FORWARD-4 | AC-13 desaturation | ⬜ Next | | | startable (FORWARD-2 ✅; fixture now hue-faithful post DATA-8) |
-| 17 | DATA-2 | AC-8 resample | ⬜ Todo | | | startable ∥ COLOR-3, KM-3 |
+| 16 | FORWARD-4 | AC-13 desaturation | ✅ Done | 4.82M | 9m 00s | AC-13 un-pended, green (desaturation already holds via FORWARD-2 forward + DATA-8 hue-faithful fixture; no lib change); 11 A re-grade, 0 fixes; coverage-gate empty-array fix |
+| 17 | DATA-2 | AC-8 resample | ⬜ Next | | | startable now (independent of fixture) ∥ SOLVER-6 |
 | 18 | DATA-3 | AC-6 artifact | ⬜ Todo | | | |
 | 19 | DATA-4 | AC-10 masstone–tint | ⬜ Todo | | | |
 | 20 | DATA-5 | AC-7 round-trip fidelity | ⬜ Todo | | | needs G-3 |
@@ -260,11 +260,11 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 
 ## Next phase
 
-**DATA-8 ✅ (2026-10-17): synthetic fixture is now hue-faithful.** Inverted the `_chroma` K Gaussian so a paint reflects at its named hue (not its complement); moved two peak bins (acrylic phthalo_blue 4→6, oil yellow_ochre 10→18). Pure paints render true hues (blue h≈275, red h≈28, oil ultramarine blue, oil yellow_ochre yellow); assets regenerated (parity ✅). Default suite 136 green; run-pending red baseline unchanged (only later-phase unbuilt ACs fail). Coverage 32/32 on the one touched file. **AC-17 cool-blue reachable ΔE00 3.69** (white 0.917 + phthalo_blue 0.083, recorded for SOLVER-6); **AC-18 green stays out-of-gamut** (ΔE00 32.40). Fresh adversarial re-grade of all 10 un-pended ACs → **10 A, 0 downgrades** (AC-16/AC-19 controls strengthened).
+**FORWARD-4 ✅ (2026-10-17): AC-13 natural desaturation un-pended, green.** No `lib/` code needed — the desaturation property (chroma(KM mix) < chroma(naive sRGB-midpoint blend)) already holds via the live FORWARD-2 `forward` over the DATA-8 hue-faithful fixture (measured gap 0.0162 vs 0.0485, ≈3× desaturation). Sanctioned green-at-baseline un-pend. Grade gate: fresh adversarial re-grade of all 11 un-pended ACs → **11 A, 0 B, 0 fixes**; AC-13's strict-`<` flag quantified and discharged. Also fixed a latent `set -u` empty-array bug in `tool/coverage_gate.sh` (tripped on any phase touching no `lib/` file). 11 un-pended / 16 pending.
 
-**Next, startable now (disjoint, run either):**
-- **FORWARD-4** (AC-13 desaturation, `inverse.dart`/forward surface) — reads the now-faithful fixture; was deferred behind DATA-8, now clear. ⬜ Next.
-- **DATA-2** (AC-8 resample, `resample.dart`) — independent of the fixture.
+**Next, startable now (disjoint):**
+- **DATA-2** (AC-8 resample, `resample.dart`) — independent of the fixture. ⬜ Next.
+- **SOLVER-6** (AC-17 in-gamut ≤5, `inverse.dart`) — fixture-unblocked by DATA-8 (target reachable ΔE00 3.69); but see the dependency drift below. Merge-risky with any other `lib/src/engine/*` phase — don't run concurrently with a FORWARD/SOLVER/PROD-3 phase.
 
 **⚠ SOLVER-6 dependency drift — reconcile before running it:** `SOLVER.md` lists SOLVER-6 *Depends on: SOLVER-5 ✅, FORWARD-3*, and neither plan lists DATA-8 as SOLVER-6's dependency, yet G-8/DATA-8 was created to unblock SOLVER-6 and FORWARD-3 is itself gated on G-3/G-4 real data. AC-17 is a **synthetic**-target test (now reachable), so FORWARD-3 looks like a stale dependency. A `--plan` reconcile (or the SOLVER-6 session) should drop FORWARD-3 and record DATA-8 as the enabler; until then SOLVER-6 reads as FORWARD-3-blocked.
 
@@ -299,7 +299,8 @@ Dataset gates G-3/G-4/G-5 block the fidelity/real-palette ACs (AC-7/9/11/12/21);
 | SOLVER-5 | 5416ac89 | 2026-10-17 07:51 EDT | 08:04 | 13m 46s | 13m 46s | claude-opus-4-8 | 140 | 270,382 | 7,616,700 | 49,461 | 7,936,683 | AC-19 un-pended & green; per-medium partition; 10 A; fix 0/3 |
 | GATE-DECISION | 6c65bcda | 2026-10-17 08:08 EDT | 08:35 | 27m 48s | 13m 59s | claude-opus-4-8 | 86 | 153,485 | 5,488,586 | 59,766 | 5,701,923 | G-8: fix synthetic fixture complement-hue bug — added DATA-8 enabler, repointed SOLVER-6 (AC-17) |
 | DATA-8 | 247d6801 | 2026-10-17 09:54 EDT | 10:09 | 15m 08s | 15m 08s | claude-opus-4-8 | 136 | 246,091 | 7,350,660 | 57,116 | 7,654,003 | enabler: synthetic fixture hue-faithful; suite green 136; coverage 32/32; AC-17 reachable ΔE00 3.69; AC-18 oog holds; re-grade 10 A |
-| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-17 10:09** | **11h 14m** | **5h 35m** |  | **2,678** | **4,462,953** | **151,152,420** | **1,189,363** | **156,807,414** |  |
+| FORWARD-4 | e1d27a7d | 2026-10-17 18:06 EDT | 18:15 | 9m 00s | 9m 00s | claude-opus-4-8 | 102 | 235,263 | 4,560,685 | 25,737 | 4,821,787 | AC-13 un-pended, green; 11 A re-grade, 0 fixes; coverage-gate empty-array fix |
+| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-17 18:15** | **11h 23m** | **5h 44m** |  | **2,780** | **4,698,216** | **155,713,105** | **1,215,100** | **161,629,201** |  |
 
 ## Sign-off
 
