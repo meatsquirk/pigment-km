@@ -9,13 +9,14 @@ import '../types/recipe.dart';
 import 'forward.dart';
 
 /// The inverse solver (design §6.2) — SOLVER-2 the palette-constrained search,
-/// SOLVER-3 the ranking (best-first by ΔE00, preferring fewer paints on a tie).
+/// SOLVER-3 the ranking (best-first by ΔE00, preferring fewer paints on a tie),
+/// SOLVER-4 the honest out-of-gamut flag (an unreachable target's recipes are
+/// flagged nearest approaches, never claimed matches).
 ///
 /// Given a [target] colour, the user's declared [palette] and the solve [opts],
 /// returns candidate mixing [Recipe]s drawn **only** from that palette. Later
-/// SOLVER phases build on this base: SOLVER-4 the honest out-of-gamut flag,
-/// SOLVER-5 the explicit per-medium partition, SOLVER-6 a tighter optimizer,
-/// SOLVER-7 the performance budget.
+/// SOLVER phases build on this base: SOLVER-5 the explicit per-medium partition,
+/// SOLVER-6 a tighter optimizer, SOLVER-7 the performance budget.
 ///
 /// Every candidate is formed by enumerating subsets of the palette (size 1 up to
 /// [MixOptions.maxPaints], capped at the palette size) and fitting the volume
@@ -49,11 +50,41 @@ List<Recipe> solvePaletteConstrained(
     }
   }
   candidates.sort(_byDeltaThenFewerPaints);
-  if (candidates.length <= opts.topK) {
-    return candidates;
+  final ranked = candidates.length <= opts.topK
+      ? candidates
+      : candidates.sublist(0, opts.topK);
+
+  // AC-18: out-of-gamut is a property of the *target*, not of any one recipe.
+  // The target is reachable only if even the best achievable mix lands within
+  // the in-gamut ceiling [MixOptions.gamutThreshold]; `ranked.first` is that
+  // best (the sort put it there, and the topK cut keeps it). When the best
+  // misses, no mixture of this palette can reach the target, so every returned
+  // recipe is an honest nearest approach — each is flagged and relabelled so
+  // the engine never reports it as a match (SI fixed intent). When the best is
+  // within the ceiling the target is in gamut and the recipes pass unflagged,
+  // so a reachable target's recipes stay `outOfGamut: false` even when a weaker
+  // alternative in the top-K exceeds the ceiling on its own.
+  if (ranked.first.deltaE00 <= opts.gamutThreshold) {
+    return ranked;
   }
-  return candidates.sublist(0, opts.topK);
+  return <Recipe>[for (final r in ranked) _flaggedOutOfGamut(r)];
 }
+
+/// Re-stamps [recipe] as the honest nearest approach to an unreachable target:
+/// the [Recipe.outOfGamut] flag set and the verdict relabelled so no caller can
+/// read it as a claimed match (AC-18). Every other field — the fitted parts,
+/// predicted colour, true ΔE00 distance and provenance — is carried through
+/// unchanged, so the distance stays honest.
+Recipe _flaggedOutOfGamut(Recipe recipe) => Recipe(
+      medium: recipe.medium,
+      parts: recipe.parts,
+      colour: recipe.colour,
+      deltaE00: recipe.deltaE00,
+      provenance: recipe.provenance,
+      outOfGamut: true,
+      verdict:
+          'out of gamut — nearest ΔE00 ${recipe.deltaE00.toStringAsFixed(2)}',
+    );
 
 /// Ranks two candidate recipes best-first: lower ΔE00 wins, and on an **exact**
 /// ΔE00 tie the recipe using fewer paints wins (AC-15 "prefer fewer paints").

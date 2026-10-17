@@ -481,11 +481,16 @@ void main() {
 
       // THEN the recipe is flagged out-of-gamut and carries its honest ΔE00
       // distance, and is never reported as a match. Rejects a solver that
-      // returns the nearest mix unflagged (a false recipe).
+      // returns the nearest mix unflagged (a false recipe), and one that flags
+      // the recipe yet leaves a match-style verdict (the plain-language reading
+      // must also say out-of-gamut, never a match).
       expect(best.outOfGamut, isTrue,
           reason: 'an unreachable target must be flagged out-of-gamut');
       expect(best.deltaE00, greaterThan(const MixOptions().gamutThreshold),
           reason: 'its honest ΔE00 must exceed the in-gamut ceiling (5)');
+      expect(best.verdict, contains('out of gamut'),
+          reason: 'the plain-language verdict must read as out-of-gamut, never '
+              'a match');
     }, skip: ac('AC-18'));
   });
 }

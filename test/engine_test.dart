@@ -191,6 +191,69 @@ void main() {
     });
   });
 
+  group('CustomKmEngine.inverse — out-of-gamut honesty (SOLVER-4)', () {
+    const engine = CustomKmEngine();
+    final acrylic = PigmentTable.load(Medium.acrylic).pigments; // white, blue, red
+    const whiteId = 'acrylic.titanium_white';
+    const blueId = 'acrylic.phthalo_blue';
+    final whiteBlue =
+        acrylic.where((p) => p.id == whiteId || p.id == blueId).toList();
+
+    test('a palette with no green flags a saturated green target out-of-gamut and '
+        'never claims a match', () {
+      // GIVEN the acrylic palette (white, blue, red — no green primary) and a
+      // vivid pure-green target no mixture of it can reach within the ceiling.
+      const green = ColourValue(
+        srgb: (r: 0.0, g: 1.0, b: 0.0),
+        xyz: (x: 0.3576, y: 0.7152, z: 0.1192),
+        oklch: (l: 0.866, c: 0.295, h: 142.5),
+      );
+
+      // WHEN the solver returns its recipes.
+      final recipes = engine.inverse(green, acrylic, const MixOptions());
+      expect(recipes, isNotEmpty);
+
+      // THEN every returned recipe is the honest nearest approach: flagged
+      // out-of-gamut, carrying a true ΔE00 beyond the ceiling, and relabelled so
+      // it reads as out of gamut rather than a match. Rejects an engine that
+      // returns the nearest mix unflagged or keeps a match-style verdict.
+      const ceiling = 5.0;
+      for (final r in recipes) {
+        expect(r.outOfGamut, isTrue);
+        expect(r.deltaE00, greaterThan(ceiling));
+        expect(r.verdict, contains('out of gamut'));
+        expect(r.verdict, contains(r.deltaE00.toStringAsFixed(2)));
+      }
+    });
+
+    test('a reachable target leaves the whole recipe set unflagged, even a weak '
+        'alternative beyond the ceiling', () {
+      // GIVEN the target is exactly pure white's own colour, so pure white
+      // matches it (ΔE00 ≈ 0) — the target is in gamut.
+      final target = engine.forward(const {whiteId: 1.0});
+      const opts = MixOptions(maxPaints: 2, topK: 3);
+      final recipes = engine.inverse(target, whiteBlue, opts);
+
+      // The full candidate set is returned (3 subsets ≤ topK), so the pure-blue
+      // recipe — a far, beyond-ceiling alternative — is present.
+      expect(recipes, hasLength(3));
+      final best = recipes.first;
+      expect(best.parts.keys, orderedEquals([whiteId]));
+      expect(best.deltaE00, lessThanOrEqualTo(opts.gamutThreshold));
+      final pureBlue = recipes.firstWhere(
+          (r) => r.parts.length == 1 && r.parts.containsKey(blueId));
+      expect(pureBlue.deltaE00, greaterThan(opts.gamutThreshold),
+          reason: 'the pure-blue alternative must itself miss the ceiling');
+
+      // THEN because the *best* recipe is in gamut, the target is reachable, so
+      // no recipe is flagged — not even the weak pure-blue one. Rejects a
+      // per-recipe flag that would mark `pureBlue` out-of-gamut on its own ΔE00.
+      expect(recipes, everyElement(predicate<Recipe>((r) => !r.outOfGamut)),
+          reason: 'out-of-gamut is a target-level verdict, not per recipe');
+      expect(best.verdict, isNot(contains('out of gamut')));
+    });
+  });
+
   group('deltaE2000 colour difference (solver metric)', () {
     test('identical colours are ΔE00 0; XYZ wrapper agrees with Lab', () {
       expect(deltaE2000Lab(50, 10, -20, 50, 10, -20), closeTo(0, 1e-12));
