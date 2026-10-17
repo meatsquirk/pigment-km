@@ -1,7 +1,7 @@
 # Master Plan — pigment_km: measured-pigment Kubelka–Munk mixing engine
 
 **Spec:** [pigment-km-engine.feature](../pigment-km-engine.feature)
-**Status:** In progress — behaviour stage: SOLVER-5 ✅ (per-medium partition live; AC-19 ✅); next DATA-2 ∥ FORWARD-4 ∥ SOLVER-6 startable
+**Status:** In progress — G-8 decided 2026-10-17 (fix the synthetic fixture's complement-hue bug, not retarget AC-17); next **DATA-8** (fixture-hue enabler) → unblocks SOLVER-6; DATA-2 ∥ FORWARD-4 also startable
 **Architecture:** [Nuance/docs/custom-mixing-engine-design.md](../../../Nuance/docs/custom-mixing-engine-design.md) (physics §3, datasets §4, forward/inverse §6, tuning §7, staged plan §8, licensing §13) · [Nuance/docs/paint-color-app-solution-intent.md](../../../Nuance/docs/paint-color-app-solution-intent.md) (D3/D6/D7/D9, accuracy NFRs) · consumption contract: `Nuance/lib/recipes/engine/mixing_engine.dart` (bs-04)
 **Code home:** `/Users/matthew.quirk/pigment_km` · remote `https://github.com/meatsquirk/pigment-km` (origin, pushed) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
 
@@ -48,7 +48,7 @@ Greenfield — nothing exists yet; every AC is net-new. The gap is the whole lib
 | 1 Scaffold | CORE-1 |
 | 2 Component shells | CORE-2, DATA-1 |
 | 3 Acceptance tests | ITEST-1, ITEST-2, ITEST-3, ITEST-4, ITEST-5 (test review, G-2) |
-| 4 Behavior | COLOR-2, COLOR-3, KM-2, KM-3, KM-4, FORWARD-2, FORWARD-3, FORWARD-4, DATA-2, DATA-3, DATA-4, DATA-5, DATA-6, DATA-7, SOLVER-2, SOLVER-3, SOLVER-4, SOLVER-5, SOLVER-6, SOLVER-7, TUNE-2, TUNE-3, TUNE-4, PROD-2, PROD-3, STRETCH-2, STRETCH-3 |
+| 4 Behavior | COLOR-2, COLOR-3, KM-2, KM-3, KM-4, FORWARD-2, FORWARD-3, FORWARD-4, DATA-2, DATA-3, DATA-4, DATA-5, DATA-6, DATA-7, DATA-8 (enabler), SOLVER-2, SOLVER-3, SOLVER-4, SOLVER-5, SOLVER-6, SOLVER-7, TUNE-2, TUNE-3, TUNE-4, PROD-2, PROD-3, STRETCH-2, STRETCH-3 |
 | 5 Sign-off | SIGNOFF-1 |
 
 ## Acceptance criteria coverage
@@ -71,7 +71,7 @@ Greenfield — nothing exists yet; every AC is net-new. The gap is the whole lib
 | AC-14 | Volumes are normalized before mixing | ITEST-3 `TestAC14_Normalize` | FORWARD-2 | ✅ |
 | AC-15 | The inverse solver returns ranked recipes preferring fewer paints | ITEST-3 `TestAC15_RankedPreferFewer` | SOLVER-3 | ✅ |
 | AC-16 | Recipes use only paints in the declared palette | ITEST-3 `TestAC16_PaletteOnly` | SOLVER-2 | ✅ |
-| AC-17 | An in-gamut target is matched within the recipe accuracy target | ITEST-3 `TestAC17_InGamut` | SOLVER-6 | ⬜ Todo |
+| AC-17 | An in-gamut target is matched within the recipe accuracy target | ITEST-3 `TestAC17_InGamut` | DATA-8 (enabler) → SOLVER-6 | ⬜ Todo |
 | AC-18 | An out-of-gamut target is flagged, never faked | ITEST-3 `TestAC18_OutOfGamut` | SOLVER-4 | ✅ |
 | AC-19 | A single recipe never spans media | ITEST-4 `TestAC19_CrossMedium` | SOLVER-5 | ✅ |
 | AC-20 | The solver returns within the performance budget | ITEST-4 `TestAC20_Performance` | SOLVER-7 | ⬜ Todo |
@@ -99,6 +99,7 @@ Greenfield — nothing exists yet; every AC is net-new. The gap is the whole lib
 | D-10 | `chromaPenalty` λ_natural is small and tie-break-only; off in raw ΔE00 ranking | breaks ties toward naturalness without compromising the match (design §7 lever 2) |
 | D-11 | STRETCH (glazing, metamerism) deferred behind G-7; `@stretch` scenarios excluded from the default acceptance run until enabled | S6 is "only if value is proven" (design §8/§9) |
 | D-12 | Wet is the default predicted state; dry via toggle; the per-medium offset is a dataset/measured constant | SI open decision #6; both ship, the default is config |
+| D-13 | The synthetic fixture (D-7) must render each chromatic paint as its *named* hue; when it doesn't, fix the fixture rather than retarget an AC | a paint named "blue" that renders orange makes synthetic targets meaningless and silently mis-scopes the in-gamut ACs (G-8, 2026-10-17) |
 
 ## Acceptance integration test plan
 
@@ -182,6 +183,7 @@ graph LR
   KM-2 --> KM-3 --> KM-4
   COLOR-3 & KM-4 --> FORWARD-2 --> FORWARD-3 & FORWARD-4
   DATA-2 --> DATA-3 --> DATA-4 --> DATA-5 & DATA-6 --> DATA-7
+  DATA-1 --> DATA-8 --> SOLVER-6
   FORWARD-2 --> SOLVER-2 --> SOLVER-3 --> SOLVER-4 --> SOLVER-5 --> SOLVER-6 --> SOLVER-7
   SOLVER-6 --> TUNE-2 & TUNE-3 & TUNE-4
   SOLVER-7 --> PROD-2 & PROD-3
@@ -202,6 +204,7 @@ graph LR
 | G-5 | decision | Confirm per-medium Saunderson k1,k2 + S-normalization from each dataset README | DATA-5, DATA-6 (folds into G-3/G-4 acquisition) | Open |
 | G-6 | dependency | Spectrophotometer availability for held-out ΔE00 validation evidence (SI open decision #3); MPI mixtures give a no-instrument oil path | AC-17 validation confidence (SOLVER-6) | Open |
 | G-7 | decision | Confirm STRETCH (S6 glazing + metamerism) scope before building it | STRETCH-2, STRETCH-3 | Open |
+| G-8 | decision | Synthetic fixture renders chromatic paints as the complement of their names (absorption K peaked at the named hue) — fix the fixture to be hue-faithful, or retarget AC-17? | DATA-8, SOLVER-6 (AC-17) | ✅ Resolved 2026-10-17: fix the fixture (new DATA-8 enabler); AC-17 keeps a genuinely in-gamut target — Matt Quirk |
 
 Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 
@@ -241,26 +244,27 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 | 24 | SOLVER-3 | AC-15 ranked / prefer fewer | ✅ Done | 14.65M | 26m 58s (3h 30m) | AC-15 un-pended, green; prefer-fewer-on-tie tie-break; 8 A (AC-15 B→A in-phase); fix 1/3 |
 | 25 | SOLVER-4 | AC-18 out-of-gamut | ✅ Done | 8.64M | 16m 37s (17m 34s) | AC-18 un-pended, green; target-level honest flag + verdict relabel; 9 A; fix 0/3 |
 | 26 | SOLVER-5 | AC-19 cross-medium | ✅ Done | 7.94M | 13m 46s | AC-19 un-pended & green; per-medium partition + pooled ranking; control proves each medium searched; 10 A; fix 0/3 |
-| 27 | SOLVER-6 | AC-17 in-gamut ≤5 | ⬜ Next | | | startable (∥ DATA-2, FORWARD-4); validation ↔ G-6 |
-| 28 | SOLVER-7 | AC-20 performance | ⬜ Todo | | | exclusive lane |
-| 29 | TUNE-2 | AC-22 chromaPenalty | ⬜ Todo | | | |
-| 30 | TUNE-3 | AC-21 curated palette | ⬜ Todo | | | real palette ↔ G-3 |
-| 31 | TUNE-4 | AC-23 wet/dry | ⬜ Todo | | | |
-| 32 | PROD-2 | AC-24 provenance | ⬜ Todo | | | |
-| 33 | PROD-3 | AC-25 A/B engines | ⬜ Todo | | | |
-| 34 | STRETCH-2 | AC-26 glazing | ⬜ Todo | | | G-7 |
-| 35 | STRETCH-3 | AC-27 metamerism | ⬜ Todo | | | G-7 |
-| 36 | SIGNOFF-1 | sign-off: packet + summary + manual approval | ⬜ Todo | | | |
+| 27 | DATA-8 | enabler: fix synthetic fixture hue faithfulness (G-8) + re-verify/re-grade whole suite | ⬜ Next | | | unblocks SOLVER-6; re-renders every synthPigments AC |
+| 28 | SOLVER-6 | AC-17 in-gamut ≤5 | ⬜ Todo | | | blocked by DATA-8 (fixture fix); then validation ↔ G-6 |
+| 29 | SOLVER-7 | AC-20 performance | ⬜ Todo | | | exclusive lane |
+| 30 | TUNE-2 | AC-22 chromaPenalty | ⬜ Todo | | | |
+| 31 | TUNE-3 | AC-21 curated palette | ⬜ Todo | | | real palette ↔ G-3 |
+| 32 | TUNE-4 | AC-23 wet/dry | ⬜ Todo | | | |
+| 33 | PROD-2 | AC-24 provenance | ⬜ Todo | | | |
+| 34 | PROD-3 | AC-25 A/B engines | ⬜ Todo | | | |
+| 35 | STRETCH-2 | AC-26 glazing | ⬜ Todo | | | G-7 |
+| 36 | STRETCH-3 | AC-27 metamerism | ⬜ Todo | | | G-7 |
+| 37 | SIGNOFF-1 | sign-off: packet + summary + manual approval | ⬜ Todo | | | |
 
 *Tokens* / *Time* = phase totals from the *Token usage* ledger (Time = active, wall in brackets), filled when a row is marked done.
 
 ## Next phase
 
-**SOLVER-5 (cross-medium rule) ✅ done** — `lib/src/engine/inverse.dart`: `solvePaletteConstrained` now partitions the palette by `Medium` and searches each medium's paints independently, then pools and ranks the groups' candidates. No recipe spans media (AC-19 / design §4.3); a single-medium palette collapses to one group = exactly the prior per-palette search, so AC-15 ranking and AC-18 out-of-gamut are unaffected. **Key finding:** the forward model refuses cross-medium mixes (throws), so a "cross-medium blend" target is physically inexpressible; the augmentation control instead targets a colour reachable only by the SECOND medium (oil), proving the solver searches each medium separately — not just `palette.first` — and still never spans. AC-19 un-pended & green; TestAC19 augmented in-phase (closes the ITEST-4 carry-forward control flag). analyze clean; `dart test` 136 pass/17 skip; acceptance default 18 pass/17 skip; cov inverse.dart 125/125. Grade **10 A** (AC-19 A; AC-1/2/3/4/5/14/15/16/18 re-confirmed). Fix passes 0/3.
+**G-8 decided (2026-10-17): fix the synthetic fixture's hue bug, not retarget AC-17.** Diagnosed in the SOLVER-6 session: `_chroma` in `synthetic_fixture.dart` peaks each chromatic paint's absorption K at its *named* hue, so paints render their complement — pure `phthalo_blue` = sRGB(0.687,0.555,0.300) (orange), `naphthol_red` cyan-ish. AC-17's cool-blue target is therefore unreachable (best ≈10.28 ΔE00); the optimizer is already accurate (≤0.76 ΔE00 on genuinely reachable targets), so this is a **fixture** defect, not a solver one. No `inverse.dart` change was made; the SOLVER-6 session was converted to this plan update.
 
-**Startable now (parallel, disjoint files):** **SOLVER-6** (AC-17 in-gamut ≤5 — tighten the per-subset optimizer; `inverse.dart` only; validation evidence ↔ G-6, which governs confidence not the solver logic) ∥ **DATA-2** (AC-8 resample, `data/resample.dart`) ∥ **FORWARD-4** (AC-13 desaturation — chroma(KM mix) < chroma(RGB blend), likely test-only over the live `forward`). Each in its own session (`--parallel` for concurrency). Merge risk: SOLVER-6 and FORWARD-4 both touch `lib/src/engine/*` — sequence them or watch the merge; DATA-2 is disjoint. SOLVER-6..7 is a chain (SOLVER-6 next in it); SOLVER-6 also closes the AC-17/AC-18 gamut pairing (the in-gamut non-flag reject). FORWARD-3 (AC-12) stays gated on G-3/G-4. `⬜ Next` is marked on SOLVER-6 as the chain head; DATA-2/FORWARD-4 are equally startable.
+**Next: DATA-8 (enabler)** — make the fixture hue-faithful, regenerate the shipped assets, re-run the **whole** suite and **re-grade every un-pended AC** (shared fixture → neighbours may shift), confirm AC-18 stays green (green still out-of-gamut). DATA-8 **blocks SOLVER-6** (AC-17). **Merge-risky:** DATA-8 touches the shared fixture every synth AC renders against — run it alone; do not parallelize it with any synth-based behavior phase.
 
-Dataset gates G-3/G-4/G-5 block only the fidelity/real-palette ACs (AC-7/9/11/12/21); everything else runs on the synthetic fixture (D-7). G-6 adds held-out validation for AC-17; G-7 gates STRETCH. Routing (G-2): AC-23 = post-prediction state transform (TUNE-4).
+**Also startable, disjoint:** **DATA-2** (AC-8 resample, `resample.dart`). **FORWARD-4** (AC-13 desaturation) reads the fixture, so sequence it after DATA-8 to avoid grading twice. Dataset gates G-3/G-4/G-5 block only the fidelity/real-palette ACs (AC-7/9/11/12/21); G-6 adds AC-17 held-out validation; G-7 gates STRETCH. Routing (G-2): AC-23 = post-prediction state transform (TUNE-4).
 
 ## Token usage
 
@@ -289,7 +293,8 @@ Dataset gates G-3/G-4/G-5 block only the fidelity/real-palette ACs (AC-7/9/11/12
 | SOLVER-3 | f5bf67c0 | 2026-10-16 19:43 EDT | 23:13 | 3h 30m | 26m 58s | claude-opus-4-8 | 194 | 369,211 | 14,188,230 | 94,192 | 14,651,827 | AC-15 ranked/prefer-fewer-on-tie un-pended & green; 8 A (AC-15 B→A in-phase); analyze clean, default 130/19, acceptance 16/19, coverage inverse.dart 113/113; fix 1/3 |
 | SOLVER-4 | 3f5220a2 | 2026-10-17 04:35 EDT | 04:52 | 17m 34s | 16m 37s | claude-opus-4-8 | 158 | 234,333 | 8,353,412 | 53,482 | 8,641,385 | AC-18 un-pended & green; honest target-level out-of-gamut flag; 9 A; coverage 122/122; fix 0/3 |
 | SOLVER-5 | 5416ac89 | 2026-10-17 07:51 EDT | 08:04 | 13m 46s | 13m 46s | claude-opus-4-8 | 140 | 270,382 | 7,616,700 | 49,461 | 7,936,683 | AC-19 un-pended & green; per-medium partition; 10 A; fix 0/3 |
-| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-17 08:04** | **10h 31m** | **5h 06m** |  | **2,456** | **4,063,377** | **138,313,174** | **1,072,481** | **143,451,488** |  |
+| GATE-DECISION | 6c65bcda | 2026-10-17 08:08 EDT | 08:35 | 27m 48s | 13m 59s | claude-opus-4-8 | 86 | 153,485 | 5,488,586 | 59,766 | 5,701,923 | G-8: fix synthetic fixture complement-hue bug — added DATA-8 enabler, repointed SOLVER-6 (AC-17) |
+| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-17 08:35** | **10h 59m** | **5h 20m** |  | **2,542** | **4,216,862** | **143,801,760** | **1,132,247** | **149,153,411** |  |
 
 ## Sign-off
 

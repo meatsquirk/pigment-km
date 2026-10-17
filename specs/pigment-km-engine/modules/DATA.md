@@ -1,9 +1,9 @@
 # Module DATA — datasets, ingestion, build artifact, attribution
 
-**Status:** In progress — DATA-1 done; next DATA-2 (blocked by G-2 test review)
+**Status:** In progress — DATA-1 done; DATA-8 (synthetic-fixture hue fix, enabler, G-8) added 2026-10-17 → next; DATA-2..7 AC phases also startable (G-2 approved)
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
-**Owns (files/areas):** `lib/src/data/pigment_table.dart` (loader), `lib/src/data/artifact_format.dart`, `lib/src/data/resample.dart`, `lib/src/data/masstone_tint.dart`, `lib/src/data/nnls_fit.dart`, `assets/pigments/*` (shipped build artifacts, medium-tagged), `NOTICE`/`ATTRIBUTION.md`, `tool/ingest/*` (offline ingest scripts, not shipped at runtime)
-**Depends on:** CORE, COLOR, KM · **Blocks:** FORWARD-3, SOLVER (real palette), TUNE-3
+**Owns (files/areas):** `lib/src/data/pigment_table.dart` (loader), `lib/src/data/artifact_format.dart`, `lib/src/data/resample.dart`, `lib/src/data/masstone_tint.dart`, `lib/src/data/nnls_fit.dart`, `lib/src/data/synthetic_fixture.dart`, `assets/pigments/*` (shipped build artifacts, medium-tagged), `NOTICE`/`ATTRIBUTION.md`, `tool/ingest/*` (offline ingest scripts, not shipped at runtime)
+**Depends on:** CORE, COLOR, KM · **Blocks:** FORWARD-3, SOLVER (real palette), TUNE-3; **DATA-8 blocks SOLVER-6** (the fixture must render faithful hues before AC-17's in-gamut target is reachable)
 
 ## Dashboard
 
@@ -16,6 +16,7 @@
 | 5 (DATA-5) | behavior | AC-7 | ⬜ Todo (G-3) | | |
 | 6 (DATA-6) | behavior | AC-9 | ⬜ Todo (G-4) | | |
 | 7 (DATA-7) | behavior | AC-11 | ⬜ Todo (G-3) | | |
+| 8 (DATA-8) | enabler | — | ⬜ Next (G-8) | | |
 
 ## Interface reconciliation
 
@@ -23,9 +24,10 @@ Build-time ingest (design §4, SI D6) produces a compact medium-tagged artifact 
 
 ## Open gates
 
-- **G-3** (dependency): the Golden/RIT acrylic data + its fields/k1,k2/attribution wording → blocks DATA-5, DATA-7.
+- **G-3** (dependency): the Golden/RIT acrylic data + its fields/k1,k2/attribution wording → blocks DATA-5, DATA-7. **Permission letter obtained 2026-10-17** (owner holds written permission from Berns/RIT) → redistribution cleared; DATA-7 must honour the letter's required attribution wording. Still open: grid/units/`k1,k2` from the dataset README, and whether IS&T paper-copyright wording is also required.
 - **G-4** (dependency): the MPI oil dataset + mixtures → blocks DATA-6.
 - **G-5** (decision): per-medium k1,k2 + S-normalization (folds into G-3/G-4).
+- **G-8** (decision, ✅ resolved 2026-10-17 — Matt Quirk): the synthetic fixture rendered chromatic paints as the **complement** of their names — `_chroma` peaked each paint's absorption K at its *named* hue's bin, so "phthalo_blue" (peakBin 4 ≈440 nm) absorbs blue and renders orange/tan, "naphthol_red" (peakBin 22 ≈620 nm) renders cyan-ish (oil ultramarine/yellow_ochre likewise). Decision: **fix the fixture to be hue-faithful (DATA-8)**, not retarget AC-17. Blocks DATA-8, SOLVER-6.
 
 ## Phase 1 — DATA-1 shell: artifact format + loader + fixture
 
@@ -118,5 +120,21 @@ Verify (green): `dart analyze` clean · `dart test` **54/54** (+26; 28 pre-exist
 - **Tasks:** finalize the MPI CC BY 4.0 notice + the Golden/RIT attribution per the granted permission wording (G-3); assert each paint's provenance reflects its source.
 - **Exit criteria:** analyze clean; 100% touched; LICENSE MIT; notices present & correct; provenance per source.
 - **Acceptance gate:** un-pend AC-11; `TestAC11_Attribution` green; **augment** the acrylic-wording placeholder.
+
+### Result · Checkpoint  <!-- filled on completion -->
+
+## Phase 8 — DATA-8: synthetic fixture hue faithfulness (enabler) — G-8
+
+- **Kind:** enabler · **Target AC:** — (makes AC-17's Given "an in-gamut target reachable by the palette" real; makes every `synthPigments`-based AC render faithful hues)
+- **Depends on:** DATA-1, ITEST-5 (G-2) · **Blocks:** SOLVER-6
+- **Files:** `lib/src/data/synthetic_fixture.dart`; `assets/pigments/synthetic_{acrylic,oil}.json` (regenerated); any unit/AC test that hardcodes a rendered synthetic colour
+- **Why (G-8, verified in the SOLVER-6 session 2026-10-17):** `_chroma` set each chromatic paint's **absorption K peak at its named hue's wavelength**, so the paint *absorbs* that hue and renders its **complement** — pure `phthalo_blue` = sRGB(0.687, 0.555, 0.300) (orange/tan), and white+blue tints move *toward* orange, not blue; `naphthol_red` (peakBin 22 ≈620 nm) renders cyan-ish; oil `ultramarine`/`yellow_ochre` likewise. So AC-17's cool-blue target sRGB(0.72, 0.76, 0.86) is unreachable (best ≈ 10.28 ΔE00) — a fixture defect, **not** a solver one (the optimizer already reaches ≤ 0.76 ΔE00 on genuinely reachable targets).
+- **Tasks:**
+  1. Correct `_chroma` so a paint **reflects** at its named hue: low absorption K near the hue's bin, higher K away from it (e.g. invert the Gaussian, `k = 0.05 + 0.9·(1 − e^{−d²})`), S flat & non-negative; `_white` unchanged. Choose each paint's hue bin so the rendered sRGB is consistent with its name (verify by rendering); keep the smooth, non-negative, "plausible but invented" D-7 spirit.
+  2. Regenerate `assets/pigments/synthetic_{acrylic,oil}.json` with the encode script (+ trailing newline); the parity test pins the exact bytes.
+  3. Re-run the **whole** suite (unit + acceptance default + run-pending) + coverage gate. Update only the unit/AC tests that hardcode a *rendered colour* that legitimately changes — record each change and its reason (never weaken an assertion). Confirm AC-18's control still holds (pure sRGB green stays unreachable with blue+red primaries → still flagged out-of-gamut) and AC-13's desaturation still holds (two differing hues).
+  4. Tune the blue so the AC-17 cool-blue region is reachable ≤ 5 ΔE00 (so SOLVER-6 can un-pend AC-17 against a genuinely in-gamut target); record the reachable cool-blue region for SOLVER-6.
+- **Exit criteria:** analyze clean; 100% of touched lines/branches; `phthalo_blue`/`naphthol_red` (and oil paints) render hues consistent with their names; whole suite green (default + run-pending, only later phases' ACs pending); AC-18 green; the AC-17 cool-blue region reachable ≤ 5 (recorded).
+- **Acceptance gate:** *(enabler — un-pends no AC)* the whole acceptance suite stays green; **re-grade every un-pended AC test** with a fresh adversarial subagent (the fixture is a shared helper → neighbours may shift) → all A (or *B pending <phase>* with a row).
 
 ### Result · Checkpoint  <!-- filled on completion -->
