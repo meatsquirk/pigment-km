@@ -1,6 +1,6 @@
 # Module DATA — datasets, ingestion, build artifact, attribution
 
-**Status:** In progress — DATA-1 ✅; DATA-8 ✅ (fixture hue-faithful, G-8); DATA-2 ✅ (AC-8 resampler); DATA-3 ✅ (AC-6 load decodes the shipped asset, 2026-10-18 — 13 A re-grade, 0 fixes). Next DATA-4 (AC-10 masstone–tint); DATA-5/6/7 gated on G-3/G-4
+**Status:** In progress — DATA-1 ✅; DATA-8 ✅ (fixture hue-faithful, G-8); DATA-2 ✅ (AC-8 resampler); DATA-3 ✅ (AC-6 load decodes the shipped asset); DATA-4 ✅ (AC-10 masstone–tint least-squares, 2026-10-18 — 14 A re-grade, 0 fixes, cov 34/34). Next DATA-5/6/7, all gated on G-3/G-4
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/data/pigment_table.dart` (loader), `lib/src/data/artifact_format.dart`, `lib/src/data/resample.dart`, `lib/src/data/masstone_tint.dart`, `lib/src/data/nnls_fit.dart`, `lib/src/data/synthetic_fixture.dart`, `assets/pigments/*` (shipped build artifacts, medium-tagged), `NOTICE`/`ATTRIBUTION.md`, `tool/ingest/*` (offline ingest scripts, not shipped at runtime)
 **Depends on:** CORE, COLOR, KM · **Blocks:** FORWARD-3, SOLVER (real palette), TUNE-3; **DATA-8 blocks SOLVER-6** (the fixture must render faithful hues before AC-17's in-gamut target is reachable)
@@ -12,7 +12,7 @@
 | 1 (DATA-1) | shell | — | ✅ Done | 4.16M | 8m39s |
 | 2 (DATA-2) | behavior | AC-8 | ✅ Done | 5.22M | 11m 07s |
 | 3 (DATA-3) | behavior | AC-6 | ✅ Done | 6.06M | 11m 08s |
-| 4 (DATA-4) | behavior | AC-10 | ⬜ Todo | | |
+| 4 (DATA-4) | behavior | AC-10 | ✅ Done | 5.41M | 11m 24s |
 | 5 (DATA-5) | behavior | AC-7 | ⬜ Todo (G-3) | | |
 | 6 (DATA-6) | behavior | AC-9 | ⬜ Todo (G-4) | | |
 | 7 (DATA-7) | behavior | AC-11 | ⬜ Todo (G-3) | | |
@@ -172,7 +172,56 @@ material (not staged).
 - **Exit criteria:** analyze clean; 100% touched; derived K,S reproduce each tint's R within tol.
 - **Acceptance gate:** un-pend AC-10; `TestAC10_MasstoneTint` green.
 
-### Result · Checkpoint  <!-- filled on completion -->
+### Result · Checkpoint  <!-- DATA-4 ✅ 2026-10-18 -->
+
+- **Landed:** `deriveKsFromMasstoneTint({masstone, tints, whiteK, whiteS})` in
+  `lib/src/data/masstone_tint.dart` (stub → real). Per-wavelength **2×2
+  least-squares** recovery of two-constant K,S: each sample (the masstone at
+  `c=1`, plus every tint at `c<1`) is the pigment mixed with the white at
+  volume-weighted `K_mix=c·K+(1−c)·K_w`, `S_mix=c·S+(1−c)·S_w`; inverting the
+  opaque KM reflectance to `x=K_mix/S_mix=(1−R)²/(2R)` (same function as
+  `kmFunction`, with a physical `R∈[1e-6,1]` clamp for user-measured tubes)
+  rearranges to the linear equation `c·K − (x·c)·S = x·(1−c)·S_w − (1−c)·K_w`.
+  The masstone fixes `K/S`; the tints' white term separates K from S. Solves the
+  per-λ normal equations; clamps K≥0, S≥1e-6 (physical). Throws `ArgumentError`
+  on an off-grid spectrum, empty `tints`, or a fraction ∉`(0,1]`, and
+  `StateError` when the 2×2 matrix is singular (the white shares the pigment's
+  K/S, or the fractions coincide — the series cannot separate K from S).
+- **Un-pend:** AC-10 row deleted from `test/acceptance/harness/pending.dart`,
+  added to `unpendedACs` in `test/acceptance/pending_gate_test.dart`. The last
+  ingest stub was removed, so `test/backends_stub_test.dart` was **deleted**
+  (both its stubs — resample at DATA-2, masstone now — are implemented). No
+  augmentation assigned or newly enabled (AC-10 has no augmentation row; the
+  function is standalone, called only by AC-10's test).
+- **Unit tests** (`test/masstone_tint_test.dart`): recovers K,S that reproduce
+  every tint + masstone within 1e-3; recovers the *true* K,S (not just the
+  ratio) within 1e-2; a measured R=0 stays finite (clamp); off-grid masstone /
+  white / tint throw; empty tints throw; fraction ∉(0,1] throws; a flat
+  single-ratio series throws `StateError` (singular).
+- **Gates:** `dart analyze lib test` clean; default suite green (156 pass / 13
+  pending-skipped); run-pending red baseline correct — AC-10 now runs un-skipped
+  and passes, the 11 still-unbuilt later-phase ACs (7/9/11/12/21–27) fail for
+  cause (AC-17/19/20 green-at-baseline); coverage **34/34 lines** on the only
+  touched lib file `masstone_tint.dart` (gate PASS).
+- **Grade gate:** fresh adversarial subagent re-graded all 14 un-pended AC tests
+  → **14 A, 0 downgrades**; AC-10 graded A (a genuine unique-solution constraint —
+  per bin reduces to `(S′−S)·(r_m·S_w−K_w)=0`, so masstone + one tint with a
+  distinct-K/S white forces S′=S, K′=K; rejects a ratio-only fit and a
+  white-ignoring fit). 13 carried ACs re-confirmed A with `git grep` isolation
+  evidence. Band appended to `behavior-test-completeness-pigment-km-engine.md`.
+- **Fix passes:** 0/3 (passed first full run).
+
+**Checkpoint / Handoff.** Verification (repo root, `export PATH="$HOME/development/flutter/bin:$PATH"`):
+`dart analyze lib test` · `dart test` (default, green) ·
+`PIGMENT_KM_RUN_PENDING=true dart test test/acceptance` (red baseline) ·
+`bash tool/coverage_gate.sh <BASE>`. **Frozen interface:**
+`({Spectrum k, Spectrum s}) deriveKsFromMasstoneTint({required Spectrum masstone, required List<Tint> tints, required Spectrum whiteK, required Spectrum whiteS})`
+— per-λ least-squares K,S derivation; `Tint = ({double pigmentFraction, Spectrum reflectance})`.
+**For DATA-5:** this is the hook for K,S derived from a user's own measured tube;
+DATA-5 ingests the real Golden/RIT turnkey K,S directly (it does not need this
+derivation path) but may reuse it for any tube-measured acrylic. **Known gap
+(unchanged):** line-coverage-only gate (CORE-1 deviation). `tool/ingest/` stays
+untracked DATA-5/6 material (not staged).
 
 ## Phase 5 — DATA-5: acrylic round-trip fidelity (AC-7) — needs G-3
 
