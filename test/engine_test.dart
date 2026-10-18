@@ -303,6 +303,73 @@ void main() {
     });
   });
 
+  group('CustomKmEngine.inverse — per-subset refinement (SOLVER-6)', () {
+    const engine = CustomKmEngine();
+    final palette = PigmentTable.load(Medium.acrylic).pigments;
+
+    test('a near-pure reachable tint is matched far tighter than the coarse '
+        'grid (refinement)', () {
+      // GIVEN a target that is EXACTLY a palette mixture at an off-grid ratio —
+      // white 0.975 + blue 0.025 — reachable by definition but sitting between
+      // the 1/12 coarse grid node and pure white. A solver that searched only
+      // the coarse grid would land ≈ 6.4 ΔE00 away (over the ≤ 5 ceiling).
+      final target = engine.forward(const {
+        'acrylic.titanium_white': 0.975,
+        'acrylic.phthalo_blue': 0.025,
+      });
+
+      final best = engine.inverse(target, palette, const MixOptions()).first;
+
+      // THEN successive refinement brings it well under 1 ΔE00 — this would fail
+      // against the coarse-grid-only optimizer, pinning the tightening.
+      expect(best.deltaE00, lessThan(1.0),
+          reason: 'refinement must match a reachable near-pure tint tightly');
+      expect(best.outOfGamut, isFalse);
+      expect(best.parts.values, everyElement(greaterThan(0.0)),
+          reason: 'every share stays strictly positive');
+      expect(best.parts.values.fold<double>(0, (a, b) => a + b),
+          closeTo(1.0, 1e-9));
+    });
+
+    test('an extreme near-white tint converges at the simplex boundary', () {
+      // GIVEN an exact mixture whose optimal blue share (0.001) is smaller than
+      // the finest refinement step, so the hill-climb drives one share toward 0
+      // and the other toward 1 and must reject moves that would cross either
+      // bound — exercising the strictly-positive guard on both sides.
+      final target = engine.forward(const {
+        'acrylic.titanium_white': 0.999,
+        'acrylic.phthalo_blue': 0.001,
+      });
+
+      final best = engine.inverse(target, palette, const MixOptions()).first;
+
+      // THEN the fit still lands within the accuracy ceiling with valid shares.
+      expect(best.deltaE00, lessThanOrEqualTo(5.0));
+      expect(best.parts.values, everyElement(greaterThan(0.0)));
+      expect(best.parts.values, everyElement(lessThan(1.0)));
+    });
+
+    test('a three-paint off-grid target is refined (2-D simplex moves)', () {
+      // GIVEN a reachable three-paint mixture at off-grid shares, so refinement
+      // runs over a 2-D simplex (shifting volume between each pair of paints).
+      final target = engine.forward(const {
+        'acrylic.titanium_white': 0.62,
+        'acrylic.phthalo_blue': 0.23,
+        'acrylic.naphthol_red': 0.15,
+      });
+
+      final recipes = engine.inverse(target, palette, const MixOptions());
+      final threePaint =
+          recipes.firstWhere((r) => r.parts.length == 3, orElse: () => recipes.first);
+
+      // THEN the best three-paint recipe is matched tightly (the coarse 1/12
+      // grid cannot land on these shares).
+      expect(threePaint.parts, hasLength(3));
+      expect(threePaint.deltaE00, lessThan(1.0),
+          reason: 'refinement reaches a reachable 3-paint mix closely');
+    });
+  });
+
   group('deltaE2000 colour difference (solver metric)', () {
     test('identical colours are ΔE00 0; XYZ wrapper agrees with Lab', () {
       expect(deltaE2000Lab(50, 10, -20, 50, 10, -20), closeTo(0, 1e-12));

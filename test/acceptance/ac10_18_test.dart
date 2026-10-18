@@ -462,6 +462,30 @@ void main() {
           reason: 'an in-gamut target must be matched within ΔE00 ≤ 5');
       expect(best.outOfGamut, isFalse,
           reason: 'a reachable target must not be flagged out-of-gamut');
+
+      // AUGMENTATION (SOLVER-6, AC-17's own Then — strengthen only): a target
+      // that is *exactly* a palette mixture at an off-grid ratio is reachable by
+      // definition, so it too must match within ΔE00 ≤ 5. This near-pure tint —
+      // white 0.975 + blue 0.025 — sits between the coarse 1/12 volume grid node
+      // (11/12 blue-share) and pure white, so a solver that searches only the
+      // coarse grid lands ≈ 6.4 ΔE00 away (its best coarse node over all subsets)
+      // and FAILS the ≤ 5 accuracy target. It is the per-subset refinement
+      // (SOLVER-6) that brings a genuinely reachable target within the ceiling —
+      // it solves this one to ≈ 0.05. The target is built through the
+      // engine's own forward model (its public surface), guaranteeing it is in
+      // gamut; the solver must independently agree (not flagged out-of-gamut).
+      const reachableMix = <String, double>{
+        'acrylic.titanium_white': 0.975,
+        'acrylic.phthalo_blue': 0.025,
+      };
+      final reachableTarget = engine.forward(reachableMix);
+      final reachableBest = engine.inverse(reachableTarget, palette, opts).first;
+      expect(reachableBest.deltaE00, lessThanOrEqualTo(opts.gamutThreshold),
+          reason: 'an exactly reachable off-grid tint must match within ΔE00 ≤ '
+              '5 — the coarse grid alone misses it by ≈ 6.4, so this rejects a '
+              'solver without per-subset refinement');
+      expect(reachableBest.outOfGamut, isFalse,
+          reason: 'a target that is literally a palette mixture is in gamut');
     }, skip: ac('AC-17'));
 
     test('AC-18 · TestAC18_OutOfGamut: an out-of-gamut target is flagged, never '

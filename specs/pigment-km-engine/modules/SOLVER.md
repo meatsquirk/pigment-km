@@ -1,6 +1,6 @@
 # Module SOLVER — the inverse solver
 
-**Status:** In progress — SOLVER-5 ✅ (per-medium partition live; AC-19 ✅); next SOLVER-6 (AC-17 in-gamut ≤5)
+**Status:** In progress — SOLVER-6 ✅ (per-subset successive refinement; AC-17 ✅ in-gamut ≤5); next SOLVER-7 (AC-20 performance, exclusive lane)
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/engine/inverse.dart` (subset enumeration, per-subset optimizer, ranking, out-of-gamut, medium partition), `lib/src/engine/custom_km_engine.dart` (`inverse`)
 **Depends on:** FORWARD · **Blocks:** TUNE, PROD
@@ -13,8 +13,8 @@
 | 3 (SOLVER-3) | behavior | AC-15 | ✅ Done | 14.65M | 26m 58s (3h 30m) |
 | 4 (SOLVER-4) | behavior | AC-18 | ✅ Done | 8.64M | 16m 37s (17m 34s) |
 | 5 (SOLVER-5) | behavior | AC-19 | ✅ Done | 7.94M | 13m 46s |
-| 6 (SOLVER-6) | behavior | AC-17 | ⬜ Next (G-6 evidence) | | |
-| 7 (SOLVER-7) | behavior | AC-20 | ⬜ Todo (exclusive lane) | | |
+| 6 (SOLVER-6) | behavior | AC-17 | ✅ Done | 10.67M | 18m 12s |
+| 7 (SOLVER-7) | behavior | AC-20 | ⬜ Next (exclusive lane) | | |
 
 ## Interface reconciliation
 
@@ -287,13 +287,66 @@ AC-15/AC-16/AC-18 are untouched (grader re-confirmed).
 
 ## Phase 6 — SOLVER-6: in-gamut accuracy (AC-17)
 
-- **Kind:** behavior · **Target AC:** AC-17 (full) · **Depends on:** SOLVER-5, FORWARD-3 · **Blocks:** SOLVER-7
+- **Kind:** behavior · **Target AC:** AC-17 (full) · **Depends on:** SOLVER-5, DATA-8 (hue-faithful fixture → the cool-tint target is reachable) · **Blocks:** SOLVER-7
 - **Files:** `inverse.dart` (optimizer quality)
 - **Tasks:** tighten the per-subset optimizer so a reachable target solves ≤ 5 ΔE00; record the swatch-set distribution (validation evidence ↔ G-6).
 - **Exit criteria:** analyze clean; 100% touched; in-gamut target ≤ 5.
 - **Acceptance gate:** un-pend AC-17; `TestAC17_InGamut` green. (Validation confidence noted against G-6.)
+- **Dependency reconcile (SOLVER-6 session, 2026-10-18):** the earlier `Depends on: FORWARD-3` was stale — FORWARD-3 (AC-12) is the *real-palette* forward-fidelity phase gated on G-3/G-4, whereas AC-17 is a **synthetic**-target test made reachable by DATA-8 (the G-8 fixture fix). FORWARD-3 dropped; DATA-8 recorded as the enabler. SOLVER-6 needs only the in-place forward model (FORWARD-2, long done) and the hue-faithful fixture.
 
-### Result · Checkpoint  <!-- filled on completion -->
+### Result · Checkpoint
+
+**Result (SOLVER-6 · AC-17).** `_bestRecipeForSubset` in
+`lib/src/engine/inverse.dart` now fits each palette-subset in two stages: the
+existing coarse 1/`_gridSteps` (12) simplex grid **locates** the best
+strictly-positive node, then **successive refinement** (`_refineRounds=3`,
+`_refineFactor=4`: step 1/12 → 1/48 → 1/192 → 1/768) hill-climbs by shifting
+`step` of volume between two paints at a time — keeping Σ=1 and every share in
+(0,1) — until no single move beats the current best by more than `_refineEps`
+(1e-12). This tightens a *reachable* target's match far below the coarse grid's:
+a near-pure tint (white 0.975 + blue 0.025) that the 1/12 grid alone misses by
+**≈6.4 ΔE00 (its best coarse node over all subsets — over the ≤5 ceiling → a
+coarse solver FAILS AC-17; the white+blue subset alone is ≈7.3)** solves to
+**≈0.05**; the AC-17 scenario target (pale cool grey) went 3.69 → ~2.60. Ranking
+(AC-15), membership (AC-16), out-of-gamut (AC-18) and the medium partition
+(AC-19) are untouched: refinement only lowers each subset's own ΔE00, so an
+unreachable target (pure green) still can't be reached and stays flagged.
+- **Swatch-set validation distribution (↔ G-6).** Over reachable in-gamut
+  targets the refined solver lands well inside the ΔE00 ≤ 5 ceiling (sampled
+  reachable mixtures: all ≤5; exact off-grid mixtures → ≈0). G-6 governs
+  *held-out spectrophotometer* confidence (physical swatches), not the solver
+  logic; the no-instrument oil path (MPI mixtures, G-4) remains the route to
+  measured evidence. Recorded as the SI-noted validation evidence.
+- **Augmentation closed (TestAC17 → SOLVER-6, G5-discriminating):** AC-17's own
+  Then was strengthened with an *exactly reachable* off-grid tint built through
+  `engine.forward` (public surface), asserting ≤5 and not-oog. It FAILS the
+  pre-phase coarse-grid optimizer (≈6.4 > 5) and PASSES the refined one — using
+  only the spec's own ≤5 threshold, no fabricated bound.
+- **Verification:** `dart analyze` → No issues · `dart test` → **160 passed / 12
+  skipped / 0 failed** (new `engine_test.dart` SOLVER-6 unit group: near-pure
+  tint tightened < 1 ΔE00, extreme near-white boundary convergence, 3-paint 2-D
+  refinement) · acceptance default `dart test test/acceptance` → **23 passed /
+  12 skipped** (AC-17 skip→pass; was 22/13) · coverage gate (vs BASE `efb8fdf`)
+  → **PASS** (`inverse.dart` **143/143** lines; +18 refinement lines all
+  covered). Line-only metric (CORE deviation) as before.
+- **Grade gate:** fresh independent adversarial subagent, G1–G6 + catalogue,
+  given the prior grid → see *Behaviour re-grade — SOLVER-6* in
+  `behavior-test-completeness-pigment-km-engine.md`.
+- **Fix passes / tokens / time:** see dashboard.
+
+**Checkpoint / Handoff.**
+- **Frozen interface (unchanged surface):** `CustomKmEngine.inverse` →
+  `solvePaletteConstrained`, same signature/exports. `_bestRecipeForSubset` now
+  coarse-grid + refines; `_refineRounds`/`_refineFactor`/`_refineEps` are private
+  consts.
+- **Verification commands (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"`
+  first. `dart analyze`; `dart test`; coverage `bash tool/coverage_gate.sh <BASE>`;
+  acceptance default `dart test test/acceptance`.
+- **For SOLVER-7 (AC-20, performance, exclusive lane):** the refinement adds
+  per-subset forward evaluations (bounded: 3 rounds × hill-climb). Precompute
+  per-paint weights and cap subset sizes (`maxPaints`) so top-3 over ~15 paints
+  returns ≤ ~2 s; time it in the exclusive lane. The coarse-then-refine split is
+  the natural place to bound the refinement work.
 
 ## Phase 7 — SOLVER-7: performance (AC-20)
 

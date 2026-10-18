@@ -12,12 +12,13 @@ import 'forward.dart';
 /// SOLVER-3 the ranking (best-first by ΔE00, preferring fewer paints on a tie),
 /// SOLVER-4 the honest out-of-gamut flag (an unreachable target's recipes are
 /// flagged nearest approaches, never claimed matches), SOLVER-5 the cross-medium
-/// partition (a single recipe never spans media).
+/// partition (a single recipe never spans media), SOLVER-6 the tighter
+/// per-subset optimizer (coarse grid then successive refinement) that matches a
+/// reachable target well within the ΔE00 accuracy ceiling.
 ///
 /// Given a [target] colour, the user's declared [palette] and the solve [opts],
-/// returns candidate mixing [Recipe]s drawn **only** from that palette. Later
-/// SOLVER phases build on this base: SOLVER-6 a tighter optimizer, SOLVER-7 the
-/// performance budget.
+/// returns candidate mixing [Recipe]s drawn **only** from that palette. SOLVER-7
+/// adds the performance budget on top of this base.
 ///
 /// Every candidate is formed by enumerating subsets of **one medium's** paints
 /// (size 1 up to [MixOptions.maxPaints], capped at that medium's paint count) and
@@ -124,14 +125,32 @@ int _byDeltaThenFewerPaints(Recipe a, Recipe b) {
   return a.parts.length.compareTo(b.parts.length);
 }
 
-/// The volume-fraction grid resolution: each paint's share is a multiple of
-/// `1 / _gridSteps`. A basic optimizer (SOLVER-2); SOLVER-6 tightens accuracy.
+/// The coarse volume-fraction grid resolution: each paint's share starts as a
+/// multiple of `1 / _gridSteps`. This grid only *locates* the basin; SOLVER-6's
+/// successive refinement (below) then tightens the fit.
 const int _gridSteps = 12;
 
+/// SOLVER-6 — the successive-refinement passes applied after the coarse grid.
+/// Each pass hill-climbs on a grid [_refineFactor]× finer than the one before,
+/// so a reachable target is matched far more tightly than the `1 / _gridSteps`
+/// grid alone, which can miss a near-pure tint by more than 5 ΔE00 (e.g. a
+/// white+blue mix only 2.5% blue sits between the 1/12 grid node and pure white,
+/// so the best coarse mix still lands over the 5 ceiling). The passes are
+/// bounded so the solve cost stays modest — SOLVER-7 owns the performance budget.
+const int _refineRounds = 3;
+const int _refineFactor = 4;
+
+/// The smallest ΔE00 improvement a refinement move must make to be accepted —
+/// below this the fit has converged, so the hill-climb stops.
+const double _refineEps = 1e-12;
+
 /// Fits the best (lowest ΔE00) mixture of exactly the paints in [subset] to
-/// [target], searching volume fractions on the simplex grid where every paint in
-/// the subset carries a strictly positive share (pure and edge mixtures are left
-/// to the smaller subsets, so a k-paint recipe genuinely uses all k paints).
+/// [target]. A coarse simplex grid (every paint carrying a strictly positive
+/// share, so pure and edge mixtures are left to the smaller subsets and a
+/// k-paint recipe genuinely uses all k paints) locates the best grid node;
+/// successive refinement (SOLVER-6) then hill-climbs on a shrinking step,
+/// shifting volume between two paints at a time so the shares always sum to 1
+/// and every share stays strictly positive, tightening the match.
 Recipe _bestRecipeForSubset(
   List<Pigment> subset,
   ColourValue target,
@@ -139,21 +158,65 @@ Recipe _bestRecipeForSubset(
   PigmentResolver resolve,
 ) {
   final ids = <String>[for (final p in subset) p.id];
-  var bestDelta = double.infinity;
-  var bestParts = const <String, double>{};
-  var bestColour = target;
-  for (final shares in _compositions(_gridSteps, subset.length)) {
+  final n = ids.length;
+
+  ({double delta, ColourValue colour}) evaluate(List<double> shares) {
     final parts = <String, double>{
-      for (var i = 0; i < ids.length; i++) ids[i]: shares[i] / _gridSteps,
+      for (var i = 0; i < n; i++) ids[i]: shares[i],
     };
     final colour = forwardColour(parts, resolve);
-    final delta = deltaE2000Xyz(colour.xyz, target.xyz);
-    if (delta < bestDelta) {
-      bestDelta = delta;
-      bestParts = parts;
-      bestColour = colour;
+    return (delta: deltaE2000Xyz(colour.xyz, target.xyz), colour: colour);
+  }
+
+  // Stage 1 — coarse grid: locate the best strictly-positive grid node.
+  var best = const <double>[];
+  var bestDelta = double.infinity;
+  var bestColour = target;
+  for (final shares in _compositions(_gridSteps, n)) {
+    final frac = <double>[for (final s in shares) s / _gridSteps];
+    final r = evaluate(frac);
+    if (r.delta < bestDelta) {
+      bestDelta = r.delta;
+      best = frac;
+      bestColour = r.colour;
     }
   }
+
+  // Stage 2 — successive refinement: on each pass shrink the step and hill-climb
+  // by moving `step` of volume from one paint to another, keeping Σ = 1 and
+  // every share in (0, 1), until no single move improves the fit.
+  var step = 1.0 / _gridSteps;
+  for (var round = 0; round < _refineRounds; round++) {
+    step /= _refineFactor;
+    var improved = true;
+    while (improved) {
+      improved = false;
+      for (var i = 0; i < n; i++) {
+        for (var j = 0; j < n; j++) {
+          if (i == j) {
+            continue;
+          }
+          final trial = <double>[...best];
+          trial[i] += step;
+          trial[j] -= step;
+          if (trial[j] <= 0 || trial[i] >= 1) {
+            continue;
+          }
+          final r = evaluate(trial);
+          if (r.delta < bestDelta - _refineEps) {
+            bestDelta = r.delta;
+            best = trial;
+            bestColour = r.colour;
+            improved = true;
+          }
+        }
+      }
+    }
+  }
+
+  final bestParts = <String, double>{
+    for (var i = 0; i < n; i++) ids[i]: best[i],
+  };
   return Recipe(
     medium: medium,
     parts: bestParts,

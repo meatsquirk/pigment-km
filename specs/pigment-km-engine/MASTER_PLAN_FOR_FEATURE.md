@@ -1,7 +1,7 @@
 # Master Plan — pigment_km: measured-pigment Kubelka–Munk mixing engine
 
 **Spec:** [pigment-km-engine.feature](../pigment-km-engine.feature)
-**Status:** In progress — DATA-4 ✅ 2026-10-18 (AC-10 un-pended, green; per-λ least-squares masstone–tint K,S derivation; 14 A re-grade, 0 fixes, cov 34/34; 14 ACs un-pended / 13 pending). Next startable: SOLVER-6 (AC-17, DATA-8-unblocked), plus SOLVER-7/TUNE-2/TUNE-4/PROD-2/PROD-3. SOLVER-6 dependency drift still to reconcile (SOLVER.md lists stale FORWARD-3 dep)
+**Status:** In progress — SOLVER-6 ✅ 2026-10-18 (AC-17 un-pended, green; per-subset coarse-grid + successive refinement; 15 A re-grade, 0 fixes, cov 143/143; stale FORWARD-3 dep reconciled → DATA-8 enabler; 15 ACs un-pended / 12 pending). Next startable: SOLVER-7 (AC-20, exclusive lane), TUNE-2/TUNE-4/PROD-2/PROD-3.
 **Architecture:** [Nuance/docs/custom-mixing-engine-design.md](../../../Nuance/docs/custom-mixing-engine-design.md) (physics §3, datasets §4, forward/inverse §6, tuning §7, staged plan §8, licensing §13) · [Nuance/docs/paint-color-app-solution-intent.md](../../../Nuance/docs/paint-color-app-solution-intent.md) (D3/D6/D7/D9, accuracy NFRs) · consumption contract: `Nuance/lib/recipes/engine/mixing_engine.dart` (bs-04)
 **Code home:** `/Users/matthew.quirk/pigment_km` · remote `https://github.com/meatsquirk/pigment-km` (origin, pushed) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
 
@@ -71,7 +71,7 @@ Greenfield — nothing exists yet; every AC is net-new. The gap is the whole lib
 | AC-14 | Volumes are normalized before mixing | ITEST-3 `TestAC14_Normalize` | FORWARD-2 | ✅ |
 | AC-15 | The inverse solver returns ranked recipes preferring fewer paints | ITEST-3 `TestAC15_RankedPreferFewer` | SOLVER-3 | ✅ |
 | AC-16 | Recipes use only paints in the declared palette | ITEST-3 `TestAC16_PaletteOnly` | SOLVER-2 | ✅ |
-| AC-17 | An in-gamut target is matched within the recipe accuracy target | ITEST-3 `TestAC17_InGamut` | DATA-8 ✅ (target reachable ΔE00 3.69) → SOLVER-6 un-pends | ⬜ Todo |
+| AC-17 | An in-gamut target is matched within the recipe accuracy target | ITEST-3 `TestAC17_InGamut` | SOLVER-6 (coarse grid + successive refinement) | ✅ |
 | AC-18 | An out-of-gamut target is flagged, never faked | ITEST-3 `TestAC18_OutOfGamut` | SOLVER-4 | ✅ |
 | AC-19 | A single recipe never spans media | ITEST-4 `TestAC19_CrossMedium` | SOLVER-5 | ✅ |
 | AC-20 | The solver returns within the performance budget | ITEST-4 `TestAC20_Performance` | SOLVER-7 | ⬜ Todo |
@@ -245,8 +245,8 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 | 25 | SOLVER-4 | AC-18 out-of-gamut | ✅ Done | 8.64M | 16m 37s (17m 34s) | AC-18 un-pended, green; target-level honest flag + verdict relabel; 9 A; fix 0/3 |
 | 26 | SOLVER-5 | AC-19 cross-medium | ✅ Done | 7.94M | 13m 46s | AC-19 un-pended & green; per-medium partition + pooled ranking; control proves each medium searched; 10 A; fix 0/3 |
 | 27 | DATA-8 | enabler: fix synthetic fixture hue faithfulness (G-8) + re-verify/re-grade whole suite | ✅ Done | 7.65M | 15m 08s | inverted `_chroma` K (reflects at hue); blue/red/oil hues faithful; assets regen (parity ✅); suite 136 green + run-pending red baseline; cov 32/32; AC-18 oog holds (ΔE00 32.40); AC-17 reachable ΔE00 3.69; re-grade 10 A; SOLVER-6 dep drift flagged |
-| 28 | SOLVER-6 | AC-17 in-gamut ≤5 | ⬜ Next | | | startable (DATA-8 ✅ made the cool-blue target reachable, ΔE00≈3.69); reconcile stale FORWARD-3 dep in SOLVER.md first; validation ↔ G-6 |
-| 29 | SOLVER-7 | AC-20 performance | ⬜ Todo | | | exclusive lane |
+| 28 | SOLVER-6 | AC-17 in-gamut ≤5 | ✅ Done | 10.67M | 18m 12s | AC-17 un-pended, green; coarse grid + successive refinement (3 rounds ×4, Σ=1 shares in (0,1)); reachable near-pure tint 6.4→0.05 ΔE00; stale FORWARD-3 dep reconciled → DATA-8 enabler; cov 143/143; 15 A re-grade; fix 0/3; validation ↔ G-6 |
+| 29 | SOLVER-7 | AC-20 performance | ⬜ Next | | | exclusive lane; refinement adds bounded per-subset evals — precompute weights + cap maxPaints |
 | 30 | TUNE-2 | AC-22 chromaPenalty | ⬜ Todo | | | |
 | 31 | TUNE-3 | AC-21 curated palette | ⬜ Todo | | | real palette ↔ G-3 |
 | 32 | TUNE-4 | AC-23 wet/dry | ⬜ Todo | | | |
@@ -260,14 +260,12 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 
 ## Next phase
 
-**DATA-4 ✅ (2026-10-18): AC-10 masstone–tint derivation un-pended, green.** `deriveKsFromMasstoneTint` recovers two-constant K,S per wavelength by 2×2 least squares across a masstone (c=1) + tint series: invert each sample's opaque-KM reflectance to `x=K_mix/S_mix`, then `c·K − (x·c)·S = x·(1−c)·S_w − (1−c)·K_w` — the masstone fixes K/S, the tints' white term separates K from S. The hook for a user's own measured tube. Last ingest stub gone → `backends_stub_test.dart` deleted. Grade gate: fresh adversarial re-grade of all 14 un-pended ACs → **14 A, 0 B, 0 fixes**; cov 34/34. 14 un-pended / 13 pending.
+**SOLVER-6 ✅ (2026-10-18): AC-17 in-gamut accuracy un-pended, green.** `_bestRecipeForSubset` now fits each palette-subset in two stages — the coarse 1/12 simplex grid locates the basin, then successive refinement (3 rounds, step ×4: 1/12→1/768) hill-climbs by shifting volume between two paints while keeping Σ=1 and every share in (0,1). A reachable near-pure tint the coarse grid alone misses by ≈6.4 ΔE00 (> the ≤5 ceiling) now solves to ≈0.05; ranking/out-of-gamut/medium-partition untouched. Stale FORWARD-3 dependency reconciled → DATA-8 recorded as the enabler (AC-17 is a synthetic-target test, not real-palette forward fidelity). Grade gate: fresh adversarial re-grade of all 15 un-pended ACs → **15 A, 0 B, 0 fixes**; cov 143/143. 15 un-pended / 12 pending.
 
 **Next, startable now:**
-- **SOLVER-6** (AC-17 in-gamut ≤5, `inverse.dart`) — fixture-unblocked by DATA-8 (target reachable ΔE00 3.69); see the dependency drift below. ⬜ Next. Merge-risky with any other `lib/src/engine/*` phase — don't run concurrently with a FORWARD/SOLVER/PROD-3 phase.
-- Also startable (no gate): **SOLVER-7** (AC-20 performance, exclusive lane), **TUNE-2** (AC-22 chromaPenalty), **TUNE-4** (AC-23 wet/dry), **PROD-2** (AC-24 provenance), **PROD-3** (AC-25 A/B engines). SOLVER-6/7, PROD-3 all touch `lib/src/engine/*` → mutually merge-risky; TUNE-2/4 and PROD-2 may be more disjoint (confirm file ownership per the module plans).
+- **SOLVER-7** (AC-20 performance, `inverse.dart`, exclusive lane) ⬜ Next — time top-3 over ~15 paints ≤ ~2 s; the refinement adds bounded per-subset evals, so precompute per-paint weights and cap `maxPaints`. Merge-risky with any other `lib/src/engine/*` phase.
+- Also startable (no gate): **TUNE-2** (AC-22 chromaPenalty), **TUNE-4** (AC-23 wet/dry), **PROD-2** (AC-24 provenance), **PROD-3** (AC-25 A/B engines). SOLVER-7 and PROD-3 both touch `lib/src/engine/*` → mutually merge-risky; TUNE-2/4 and PROD-2 may be more disjoint (confirm file ownership per the module plans).
 - **Gate-blocked:** DATA-5 (AC-7)/DATA-7 (AC-11)/TUNE-3 (AC-21) on G-3; DATA-6 (AC-9) on G-4; FORWARD-3 (AC-12) on G-3/G-4; STRETCH-2/3 on G-7.
-
-**⚠ SOLVER-6 dependency drift — reconcile before running it:** `SOLVER.md` lists SOLVER-6 *Depends on: SOLVER-5 ✅, FORWARD-3*, and neither plan lists DATA-8 as SOLVER-6's dependency, yet G-8/DATA-8 was created to unblock SOLVER-6 and FORWARD-3 is itself gated on G-3/G-4 real data. AC-17 is a **synthetic**-target test (now reachable), so FORWARD-3 looks like a stale dependency. A `--plan` reconcile (or the SOLVER-6 session) should drop FORWARD-3 and record DATA-8 as the enabler; until then SOLVER-6 reads as FORWARD-3-blocked.
 
 Dataset gates G-3/G-4/G-5 block the fidelity/real-palette ACs (AC-7/9/11/12/21); G-6 adds AC-17 held-out validation *evidence* (not the solver logic); G-7 gates STRETCH. Routing (G-2): AC-23 = post-prediction state transform (TUNE-4).
 
@@ -304,7 +302,8 @@ Dataset gates G-3/G-4/G-5 block the fidelity/real-palette ACs (AC-7/9/11/12/21);
 | DATA-2 | 8deacf3c | 2026-10-17 21:08 EDT | 21:19 | 11m 07s | 11m 07s | claude-opus-4-8 | 116 | 211,031 | 4,985,591 | 27,284 | 5,224,022 | AC-8 un-pended, green; linear resampler; cov 25/25; 12 A re-grade, 0 fixes |
 | DATA-3 | 6b7aac0b | 2026-10-18 15:07 EDT | 15:18 | 11m 08s | 11m 08s | claude-opus-4-8 | 118 | 202,672 | 5,816,522 | 37,877 | 6,057,189 | AC-6 un-pended green; load decodes shipped asset (single source), memoised; cov 12/12; 13 A re-grade, 0 fixes |
 | DATA-4 | 43cd7aba | 2026-10-18 15:40 EDT | 15:51 | 11m 24s | 11m 24s | claude-opus-4-8 | 104 | 189,309 | 5,178,278 | 37,927 | 5,405,618 | AC-10 un-pended green; per-λ 2×2 least-squares masstone–tint K,S derivation; backends_stub_test deleted; analyze clean, default 156/13, run-pending baseline correct, cov 34/34 PASS; 14 A re-grade, 0 fixes |
-| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-18 15:51** | **11h 57m** | **6h 17m** |  | **3,118** | **5,301,228** | **171,693,496** | **1,318,188** | **178,316,030** |  |
+| SOLVER-6 | 06d76f91 | 2026-10-18 15:57 EDT | 16:15 | 18m 12s | 18m 12s | claude-opus-4-8 | 184 | 220,850 | 10,384,588 | 62,283 | 10,667,905 | AC-17 un-pended & green; coarse grid + successive refinement; 15 A re-grade; cov 143/143; fix 0/3 |
+| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-18 16:15** | **12h 15m** | **6h 36m** |  | **3,302** | **5,522,078** | **182,078,084** | **1,380,471** | **188,983,935** |  |
 
 ## Sign-off
 
