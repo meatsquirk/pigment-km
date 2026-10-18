@@ -18,12 +18,8 @@ void main() {
   );
 
   group('ingest stub throws its documented UnimplementedError', () {
-    test('resampleOntoCanonical — DATA-2', () {
-      expect(
-        () => resampleOntoCanonical(const <double>[400, 700], const <double>[0, 1]),
-        throwsUnimplementedError,
-      );
-    });
+    // resampleOntoCanonical (DATA-2) is now implemented — covered by
+    // test/resample_test.dart; its stub row was dropped when AC-8 un-pended.
     test('deriveKsFromMasstoneTint — DATA-4 (added ITEST-3, Option A)', () {
       expect(
         () => deriveKsFromMasstoneTint(

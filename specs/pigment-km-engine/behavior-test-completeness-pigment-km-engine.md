@@ -350,3 +350,22 @@ throwaway scratchpad probe. **Result: 11 A, 0 B, 0 fixes owed.**
 | AC-19 | TestAC19_CrossMedium (primary + control) | A (re-confirmed) | inverse.dart partition untouched. Primary: every recipe `media hasLength(1)` + `media.single==r.medium` (a cross-medium subset throws in the forward guard). Control: oil-yellow target (oil 2nd in palette) → `best.medium==oil`, bestDist<1.0, acrylic-only lands farther → rejects a first-medium-only solver. |
 
 Result: 11 A.
+
+## Band 5 — DATA-2 (AC-8 un-pended; re-confirms AC-1,2,3,4,5,13,14,15,16,18,19) · graded 2026-10-17
+
+Grader: fresh independent general-purpose subagent, adversarial, G1–G6. DATA-2's
+change set verified surgical (`git diff`): only `lib/src/data/resample.dart`
+(stub → real linear resampler), the two pending-gate files, `backends_stub_test.dart`
+(resample stub row dropped), and new `test/resample_test.dart`. `resampleOntoCanonical`
+is a brand-new standalone function called **only** by AC-8 and its unit test —
+`PigmentTable`/fixtures generate directly on the canonical grid and never call it —
+so the 11 carried ACs run byte-identical code to Band 4 (regression structurally
+impossible). Default suite green (AC-8 live, 15 pending skip). **Result: 12 A, 0 B,
+0 regressions.**
+
+| AC | Test | Grade | Notes |
+|---|---|---|---|
+| AC-8 | TestAC08_Resample | **A** (G5 floor met) | **Un-pended this phase; genuinely A.** Given checked (native 380–730@10 asserted `hasLength(36)`; ramp derived). When via the real barrel export `resampleOntoCanonical`. Then at grain: `out hasLength(31)` + exact value at every canonical bin (`closeTo(ramp(nm),1e-5)`) + endpoints (400→0, 700→1). **Rejects the index-misplaced copy** (native[0]=380→slot 0 → −0.0667 ≫1e-5) and window/truncation errors. **G5-floor flag (not a B):** the AC native grid is 10 nm-aligned with the canonical grid, so every canonical bin coincides with a native sample (t≡0/1) — a nearest-neighbour/no-interpolation impl would pass identically, but it is **correct** for every in-scope dataset (acrylic 380–730, oil 400–700 are both 10 nm-aligned), so not a wrong impl for any contemplated input (AC-1 single-fixture precedent). The fractional-interpolation branch IS discriminated by the companion unit test `test/resample_test.dart` (offset grid `[380,420,500,620,730]`, canonical bins strictly between samples). *Optional hardening (not owed): an offset-grid control inside AC-8.* G6 clean. |
+| AC-1..AC-5, AC-13, AC-14, AC-15, AC-16, AC-18, AC-19 | (as Band 4) | A (re-confirmed) | Byte-identical code to Band 4 — resample.dart is isolated and in no other AC test's path (verified by diff scope + grep + green suite). No grade regressed. |
+
+Result: 12 A.

@@ -1,6 +1,6 @@
 # Module DATA — datasets, ingestion, build artifact, attribution
 
-**Status:** In progress — DATA-1 ✅; DATA-8 ✅ (synthetic fixture now hue-faithful, G-8, 2026-10-17 — cool-blue reachable ΔE00 3.69, 10 A re-grade); DATA-2..7 AC phases startable (G-2 approved; DATA-5/6/7 gated on G-3/G-4)
+**Status:** In progress — DATA-1 ✅; DATA-8 ✅ (fixture hue-faithful, G-8, 2026-10-17); DATA-2 ✅ (AC-8 resampler, 2026-10-17 — 12 A re-grade, 0 fixes). Next DATA-3 (AC-6 full load path); DATA-4..7 startable per deps (DATA-5/6/7 gated on G-3/G-4)
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/data/pigment_table.dart` (loader), `lib/src/data/artifact_format.dart`, `lib/src/data/resample.dart`, `lib/src/data/masstone_tint.dart`, `lib/src/data/nnls_fit.dart`, `lib/src/data/synthetic_fixture.dart`, `assets/pigments/*` (shipped build artifacts, medium-tagged), `NOTICE`/`ATTRIBUTION.md`, `tool/ingest/*` (offline ingest scripts, not shipped at runtime)
 **Depends on:** CORE, COLOR, KM · **Blocks:** FORWARD-3, SOLVER (real palette), TUNE-3; **DATA-8 blocks SOLVER-6** (the fixture must render faithful hues before AC-17's in-gamut target is reachable)
@@ -10,7 +10,7 @@
 | Phase | Kind | Target AC | Status | Tokens | Time |
 |---|---|---|---|---|---|
 | 1 (DATA-1) | shell | — | ✅ Done | 4.16M | 8m39s |
-| 2 (DATA-2) | behavior | AC-8 | ⬜ Todo | | |
+| 2 (DATA-2) | behavior | AC-8 | ✅ Done | 5.22M | 11m 07s |
 | 3 (DATA-3) | behavior | AC-6 | ⬜ Todo | | |
 | 4 (DATA-4) | behavior | AC-10 | ⬜ Todo | | |
 | 5 (DATA-5) | behavior | AC-7 | ⬜ Todo (G-3) | | |
@@ -66,7 +66,42 @@ Verify (green): `dart analyze` clean · `dart test` **54/54** (+26; 28 pre-exist
 - **Exit criteria:** analyze clean; 100% touched; length 31; interior + endpoint interpolation correct.
 - **Acceptance gate:** un-pend AC-8; `TestAC08_Resample` green.
 
-### Result · Checkpoint  <!-- filled on completion -->
+### Result · Checkpoint  <!-- DATA-2 ✅ 2026-10-17 -->
+
+- **Landed:** `resampleOntoCanonical(List<double> wavelengthsNm, List<double> values)`
+  in `lib/src/data/resample.dart` (stub → real). Linear interpolation onto the
+  canonical 400–700@10 grid (31 bins); strictly-ascending native wavelengths,
+  ≥ 2 samples, equal lengths validated (`ArgumentError`); canonical bins outside
+  the native range held flat at the nearest endpoint (documented constant
+  extrapolation — never needed by the in-scope grids but keeps a short grid
+  well-defined). A single advancing cursor over the native grid → O(n+m).
+- **Un-pend:** AC-8 row deleted from `test/acceptance/harness/pending.dart`, added
+  to `unpendedACs` in `test/acceptance/pending_gate_test.dart`; the
+  `resampleOntoCanonical` `throwsUnimplementedError` row dropped from
+  `test/backends_stub_test.dart` (now implemented). New unit suite
+  `test/resample_test.dart` (interior interpolation on an offset grid, exact-hit
+  copy, flat clamp both ends, all three validation throws).
+- **Gates:** `dart analyze` clean (touched files); default suite green
+  (AC-8 live and passing); run-pending red baseline unchanged except AC-8 now
+  green (12 failures = the still-pending later-phase ACs); coverage **25/25 lines**
+  on `resample.dart` (gate PASS). No augmentations assigned/enabled (resample is
+  a standalone ingest helper no other AC test depends on).
+- **Grade gate:** fresh adversarial subagent re-graded all 12 un-pended AC tests
+  → **12 A, 0 B, 0 regressions**. AC-8 re-confirmed A (rejects the index-misplaced
+  copy; the fractional-interpolation branch, unexercised by the 10 nm-aligned AC
+  fixture, is discriminated by `test/resample_test.dart`). Band appended to
+  `behavior-test-completeness-pigment-km-engine.md`.
+- **Fix passes:** 0/3 (passed first full run).
+
+**Checkpoint / Handoff.** Verification (repo root, `export PATH="$HOME/development/flutter/bin:$PATH"`):
+`dart analyze lib test` · `dart test` (default, green) ·
+`PIGMENT_KM_RUN_PENDING=true dart test test/acceptance` (red baseline) ·
+`bash tool/coverage_gate.sh <BASE>`. **Frozen interface:**
+`Spectrum resampleOntoCanonical(List<double> wavelengthsNm, List<double> values)`
+— ascending native grid, linear interp onto the canonical grid, endpoint clamp.
+**Next DATA-3** (AC-6 full artifact load path, `pigment_table.dart`/`artifact_format.dart`):
+make `load` *decode the shipped asset* and use `resampleOntoCanonical` for any
+native-grid ingest; DATA-3 blocks on nothing new (G-2 cleared).
 
 ## Phase 3 — DATA-3: artifact fields loaded (AC-6)
 

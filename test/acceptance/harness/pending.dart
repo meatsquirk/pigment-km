@@ -14,7 +14,6 @@ import 'dart:io';
 const Map<String, String> pendingACs = <String, String>{
   'AC-6': 'DATA-3',
   'AC-7': 'DATA-5',
-  'AC-8': 'DATA-2',
   'AC-9': 'DATA-6',
   'AC-10': 'DATA-4',
   'AC-11': 'DATA-7',
