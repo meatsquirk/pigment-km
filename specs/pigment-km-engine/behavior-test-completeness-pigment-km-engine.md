@@ -369,3 +369,14 @@ impossible). Default suite green (AC-8 live, 15 pending skip). **Result: 12 A, 0
 | AC-1..AC-5, AC-13, AC-14, AC-15, AC-16, AC-18, AC-19 | (as Band 4) | A (re-confirmed) | Byte-identical code to Band 4 — resample.dart is isolated and in no other AC test's path (verified by diff scope + grep + green suite). No grade regressed. |
 
 Result: 12 A.
+
+## Behaviour re-grade — DATA-3 (un-pended AC-6) · graded 2026-10-18
+
+**13 A, 0 downgrades.** Fresh adversarial subagent (G1–G6 + catalogue), given the prior grid and asked to justify any downgrade against a named rule. Default suite green (148 passed); run-pending red baseline correct (the 14 still-pending ACs run, 12 fail for the right reason, AC-17/20 green-at-baseline); all 13 un-pended ACs pass in the default run and none appear in the run-pending failing set. **No regressions** — the file-sourced palette is byte-identical to the prior in-memory fixture (the `shipped synthetic asset parity (no drift)` test enforces on-disk bytes == `encode(SyntheticFixture.artifact(medium))`+"\n", and Pigment `==` deep-compares K/S), so every AC taking its palette via `synthPigments()` (AC-5/13/14/15/16/18/19) sees unchanged values.
+
+| AC | Test | Grade | Justification |
+|---|---|---|---|
+| AC-6 | TestAC06_Artifact | **A** (was green-at-baseline) | **Load-from-asset now genuinely exercised:** `PigmentTable.load` reads+decodes `File(assetPathFor(medium))` (throws `FileSystemException`/`FormatException` on a missing/malformed file). The test independently `decode`s the asset and asserts `table.pigments[i] == decoded.pigments[i]` for every paint (Pigment `==` deep-compares K/S via `spectraEqual` + medium/provenance/sourceRef/opacity/pigmentIndex), plus per-field Thens (K/S length 31 + finite, pigmentIndex non-empty, opacity∈[0,1], provenance∈enum, `p.medium==medium`). Rejects a loader that drops K/S, leaves provenance null, mistags medium, or uses a wrong grid length. The one wrong loader no value-based assertion can separate — "rebuilds identical data in memory instead of reading the file" — is byte-indistinguishable by construction (parity test); the file-source guarantee is independently pinned by that parity test + load's throw-on-missing/malformed contract. |
+| AC-1..AC-5, AC-8, AC-13, AC-14, AC-15, AC-16, AC-18, AC-19 | (as prior bands) | A (re-confirmed) | DATA-3 touched only `pigment_table.dart` (the load path). Palettes via `synthPigments()` are now file-sourced but byte-identical (parity test). No grade regressed. |
+
+Result: 13 A.

@@ -1,7 +1,7 @@
 # Master Plan — pigment_km: measured-pigment Kubelka–Munk mixing engine
 
 **Spec:** [pigment-km-engine.feature](../pigment-km-engine.feature)
-**Status:** In progress — DATA-2 ✅ 2026-10-17 (AC-8 un-pended, green; 12 A re-grade, 0 fixes; 12 ACs un-pended / 15 pending). Next startable: DATA-3, SOLVER-6 (disjoint). SOLVER-6 dependency drift still to reconcile (SOLVER.md lists stale FORWARD-3 dep)
+**Status:** In progress — DATA-3 ✅ 2026-10-18 (AC-6 un-pended, green; `load` decodes the shipped asset; 13 A re-grade, 0 fixes; 13 ACs un-pended / 14 pending). Next startable: DATA-4, SOLVER-6 (disjoint). SOLVER-6 dependency drift still to reconcile (SOLVER.md lists stale FORWARD-3 dep)
 **Architecture:** [Nuance/docs/custom-mixing-engine-design.md](../../../Nuance/docs/custom-mixing-engine-design.md) (physics §3, datasets §4, forward/inverse §6, tuning §7, staged plan §8, licensing §13) · [Nuance/docs/paint-color-app-solution-intent.md](../../../Nuance/docs/paint-color-app-solution-intent.md) (D3/D6/D7/D9, accuracy NFRs) · consumption contract: `Nuance/lib/recipes/engine/mixing_engine.dart` (bs-04)
 **Code home:** `/Users/matthew.quirk/pigment_km` · remote `https://github.com/meatsquirk/pigment-km` (origin, pushed) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
 
@@ -60,7 +60,7 @@ Greenfield — nothing exists yet; every AC is net-new. The gap is the whole lib
 | AC-3 | Kubelka–Munk reflectance and K/S round-trip | ITEST-2 `TestAC03_KmRoundTrip` | KM-2 | ✅ |
 | AC-4 | Saunderson correction round-trips per medium | ITEST-2 `TestAC04_Saunderson` | KM-3 | ✅ |
 | AC-5 | Two-constant mixing is linear and order-independent | ITEST-2 `TestAC05_TwoConstantMix` | FORWARD-2 (un-pend) · KM-4 (mixing ✅) | ✅ |
-| AC-6 | The pigment table ships as a medium-tagged build artifact | ITEST-2 `TestAC06_Artifact` | DATA-3 | ⬜ Todo |
+| AC-6 | The pigment table ships as a medium-tagged build artifact | ITEST-2 `TestAC06_Artifact` | DATA-3 | ✅ Done |
 | AC-7 | Every ingested paint round-trips to its published colour | ITEST-2 `TestAC07_RoundTripFidelity` | DATA-5 | ⬜ Todo |
 | AC-8 | Native dataset grids are resampled onto the canonical grid | ITEST-2 `TestAC08_Resample` | DATA-2 | ✅ Done |
 | AC-9 | Oil K and S are fit from mixtures and validated on held-out ones | ITEST-2 `TestAC09_OilFit` | DATA-6 | ⬜ Todo |
@@ -235,8 +235,8 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 | 15 | FORWARD-3 | AC-12 forward fidelity | ⬜ Todo | | | needs G-3/G-4 |
 | 16 | FORWARD-4 | AC-13 desaturation | ✅ Done | 4.82M | 9m 00s | AC-13 un-pended, green (desaturation already holds via FORWARD-2 forward + DATA-8 hue-faithful fixture; no lib change); 11 A re-grade, 0 fixes; coverage-gate empty-array fix |
 | 17 | DATA-2 | AC-8 resample | ✅ Done | 5.22M | 11m 07s | AC-8 un-pended, green; linear resampler onto canonical grid; cov 25/25; 12 A re-grade, 0 fixes |
-| 18 | DATA-3 | AC-6 artifact | ⬜ Next | | | startable now (G-2 cleared) ∥ SOLVER-6 (disjoint files) |
-| 19 | DATA-4 | AC-10 masstone–tint | ⬜ Todo | | | |
+| 18 | DATA-3 | AC-6 artifact | ✅ Done | 6.06M | 11m 08s | `load` decodes the shipped asset (single source), memoised; AC-6 un-pended, green; cov 12/12; 13 A re-grade, 0 fixes |
+| 19 | DATA-4 | AC-10 masstone–tint | ⬜ Next | | | startable now (depends on DATA-3 ✅, KM-3 ✅) |
 | 20 | DATA-5 | AC-7 round-trip fidelity | ⬜ Todo | | | needs G-3 |
 | 21 | DATA-6 | AC-9 oil fit | ⬜ Todo | | | needs G-4 |
 | 22 | DATA-7 | AC-11 attribution + provenance | ⬜ Todo | | | needs G-3 wording |
@@ -260,10 +260,10 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 
 ## Next phase
 
-**DATA-2 ✅ (2026-10-17): AC-8 native→canonical resampler un-pended, green.** Implemented `resampleOntoCanonical` (linear interpolation onto 400–700@10, strict-ascending/length/≥2 validation, flat endpoint clamp) in `resample.dart`; a standalone ingest helper no other AC test depends on. Grade gate: fresh adversarial re-grade of all 12 un-pended ACs → **12 A, 0 B, 0 fixes**; AC-8's G5 interpolation flag covered by the companion unit test. 12 un-pended / 15 pending.
+**DATA-3 ✅ (2026-10-18): AC-6 artifact load path un-pended, green.** `PigmentTable.load` now **decodes the shipped asset** `assets/pigments/synthetic_<medium>.json` (the file is the single source of truth; no in-memory rebuild), memoised per medium so the engine forward path reads it once. New `PigmentTable.assetPathFor(Medium)` centralises the path for DATA-5/6. Load does not resample (decode rejects non-canonical grids — resample is an ingest step). Grade gate: fresh adversarial re-grade of all 13 un-pended ACs → **13 A, 0 B, 0 fixes**. 13 un-pended / 14 pending.
 
 **Next, startable now (disjoint files):**
-- **DATA-3** (AC-6 full artifact load path, `pigment_table.dart`/`artifact_format.dart`) — `load` decodes the shipped asset; uses `resampleOntoCanonical` for native-grid ingest. ⬜ Next.
+- **DATA-4** (AC-10 masstone–tint derivation, `masstone_tint.dart`) — depends on DATA-3 ✅ + KM-3 ✅; derive K,S from a masstone+tint series by least squares. ⬜ Next.
 - **SOLVER-6** (AC-17 in-gamut ≤5, `inverse.dart`) — fixture-unblocked by DATA-8 (target reachable ΔE00 3.69); but see the dependency drift below. Merge-risky with any other `lib/src/engine/*` phase — don't run concurrently with a FORWARD/SOLVER/PROD-3 phase.
 
 **⚠ SOLVER-6 dependency drift — reconcile before running it:** `SOLVER.md` lists SOLVER-6 *Depends on: SOLVER-5 ✅, FORWARD-3*, and neither plan lists DATA-8 as SOLVER-6's dependency, yet G-8/DATA-8 was created to unblock SOLVER-6 and FORWARD-3 is itself gated on G-3/G-4 real data. AC-17 is a **synthetic**-target test (now reachable), so FORWARD-3 looks like a stale dependency. A `--plan` reconcile (or the SOLVER-6 session) should drop FORWARD-3 and record DATA-8 as the enabler; until then SOLVER-6 reads as FORWARD-3-blocked.
@@ -301,7 +301,8 @@ Dataset gates G-3/G-4/G-5 block the fidelity/real-palette ACs (AC-7/9/11/12/21);
 | DATA-8 | 247d6801 | 2026-10-17 09:54 EDT | 10:09 | 15m 08s | 15m 08s | claude-opus-4-8 | 136 | 246,091 | 7,350,660 | 57,116 | 7,654,003 | enabler: synthetic fixture hue-faithful; suite green 136; coverage 32/32; AC-17 reachable ΔE00 3.69; AC-18 oog holds; re-grade 10 A |
 | FORWARD-4 | e1d27a7d | 2026-10-17 18:06 EDT | 18:15 | 9m 00s | 9m 00s | claude-opus-4-8 | 102 | 235,263 | 4,560,685 | 25,737 | 4,821,787 | AC-13 un-pended, green; 11 A re-grade, 0 fixes; coverage-gate empty-array fix |
 | DATA-2 | 8deacf3c | 2026-10-17 21:08 EDT | 21:19 | 11m 07s | 11m 07s | claude-opus-4-8 | 116 | 211,031 | 4,985,591 | 27,284 | 5,224,022 | AC-8 un-pended, green; linear resampler; cov 25/25; 12 A re-grade, 0 fixes |
-| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-17 21:19** | **11h 34m** | **5h 55m** |  | **2,896** | **4,909,247** | **160,698,696** | **1,242,384** | **166,853,223** |  |
+| DATA-3 | 6b7aac0b | 2026-10-18 15:07 EDT | 15:18 | 11m 08s | 11m 08s | claude-opus-4-8 | 118 | 202,672 | 5,816,522 | 37,877 | 6,057,189 | AC-6 un-pended green; load decodes shipped asset (single source), memoised; cov 12/12; 13 A re-grade, 0 fixes |
+| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-18 15:18** | **11h 45m** | **6h 06m** |  | **3,014** | **5,111,919** | **166,515,218** | **1,280,261** | **172,910,412** |  |
 
 ## Sign-off
 

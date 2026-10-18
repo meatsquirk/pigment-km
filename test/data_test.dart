@@ -58,6 +58,39 @@ void main() {
       });
     }
 
+    for (final medium in Medium.values) {
+      test('${medium.name} is decoded from its shipped artifact — the file is '
+          'the single source', () {
+        // load == decode(the file at assetPathFor): nothing is rebuilt in
+        // memory, so the shipped artifact is authoritative.
+        final table = PigmentTable.load(medium);
+        final onDisk = File(PigmentTable.assetPathFor(medium)).readAsStringSync();
+        final decoded = PigmentArtifactCodec.decode(onDisk);
+        expect(table.medium, decoded.medium);
+        expect(table.pigments, decoded.pigments);
+      });
+    }
+
+    test('assetPathFor names the shipped per-medium artifact', () {
+      expect(PigmentTable.assetPathFor(Medium.acrylic),
+          'assets/pigments/synthetic_acrylic.json');
+      expect(PigmentTable.assetPathFor(Medium.oil),
+          'assets/pigments/synthetic_oil.json');
+    });
+
+    test('a medium is read and decoded once, then memoised (not re-read on the '
+        'forward path)', () {
+      // The second load returns the identical table — the artifact is decoded
+      // once per medium per process, not on every call.
+      expect(identical(PigmentTable.load(Medium.acrylic),
+          PigmentTable.load(Medium.acrylic)), isTrue);
+      expect(identical(PigmentTable.load(Medium.oil),
+          PigmentTable.load(Medium.oil)), isTrue);
+      // Distinct media get distinct tables.
+      expect(identical(PigmentTable.load(Medium.acrylic),
+          PigmentTable.load(Medium.oil)), isFalse);
+    });
+
     test('byId finds a paint and returns null for an unknown id', () {
       final table = PigmentTable.load(Medium.acrylic);
       final first = table.pigments.first;

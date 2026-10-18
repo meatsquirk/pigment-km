@@ -1,6 +1,6 @@
 # Module DATA — datasets, ingestion, build artifact, attribution
 
-**Status:** In progress — DATA-1 ✅; DATA-8 ✅ (fixture hue-faithful, G-8, 2026-10-17); DATA-2 ✅ (AC-8 resampler, 2026-10-17 — 12 A re-grade, 0 fixes). Next DATA-3 (AC-6 full load path); DATA-4..7 startable per deps (DATA-5/6/7 gated on G-3/G-4)
+**Status:** In progress — DATA-1 ✅; DATA-8 ✅ (fixture hue-faithful, G-8); DATA-2 ✅ (AC-8 resampler); DATA-3 ✅ (AC-6 load decodes the shipped asset, 2026-10-18 — 13 A re-grade, 0 fixes). Next DATA-4 (AC-10 masstone–tint); DATA-5/6/7 gated on G-3/G-4
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/data/pigment_table.dart` (loader), `lib/src/data/artifact_format.dart`, `lib/src/data/resample.dart`, `lib/src/data/masstone_tint.dart`, `lib/src/data/nnls_fit.dart`, `lib/src/data/synthetic_fixture.dart`, `assets/pigments/*` (shipped build artifacts, medium-tagged), `NOTICE`/`ATTRIBUTION.md`, `tool/ingest/*` (offline ingest scripts, not shipped at runtime)
 **Depends on:** CORE, COLOR, KM · **Blocks:** FORWARD-3, SOLVER (real palette), TUNE-3; **DATA-8 blocks SOLVER-6** (the fixture must render faithful hues before AC-17's in-gamut target is reachable)
@@ -11,7 +11,7 @@
 |---|---|---|---|---|---|
 | 1 (DATA-1) | shell | — | ✅ Done | 4.16M | 8m39s |
 | 2 (DATA-2) | behavior | AC-8 | ✅ Done | 5.22M | 11m 07s |
-| 3 (DATA-3) | behavior | AC-6 | ⬜ Todo | | |
+| 3 (DATA-3) | behavior | AC-6 | ✅ Done | 6.06M | 11m 08s |
 | 4 (DATA-4) | behavior | AC-10 | ⬜ Todo | | |
 | 5 (DATA-5) | behavior | AC-7 | ⬜ Todo (G-3) | | |
 | 6 (DATA-6) | behavior | AC-9 | ⬜ Todo (G-4) | | |
@@ -112,7 +112,56 @@ native-grid ingest; DATA-3 blocks on nothing new (G-2 cleared).
 - **Exit criteria:** analyze clean; 100% touched; every paint exposes all fields; medium matches.
 - **Acceptance gate:** un-pend AC-6; `TestAC06_Artifact` green.
 
-### Result · Checkpoint  <!-- filled on completion -->
+### Result · Checkpoint  <!-- DATA-3 ✅ 2026-10-18 -->
+
+- **Landed:** `PigmentTable.load(medium)` now **decodes the shipped asset** — it
+  reads `File(assetPathFor(medium)).readAsStringSync()` and
+  `PigmentArtifactCodec.decode`s it, so the file (`assets/pigments/synthetic_<medium>.json`)
+  is the single source of truth; nothing is rebuilt in memory (`load` no longer
+  imports `SyntheticFixture`). The decode throws `FileSystemException`/`FormatException`
+  on a missing or malformed artifact (a bad build fails loudly, never silently).
+  New public static `PigmentTable.assetPathFor(Medium)` centralises the path so
+  DATA-5/DATA-6 can point it at the real `<medium>.json` artifacts. **Memoised**
+  per medium (`_cache`): `load` is on the engine forward path
+  (`custom_km_engine._resolve` per paint-id), so the artifact is read+decoded once
+  per medium per process, not on every call — no perf regression (AC-20).
+- **Load does not resample:** `decode` already rejects a non-canonical grid (AC-8
+  resample is an *ingest* step, never a load one), so DATA-3's load path leaves
+  `resampleOntoCanonical` to DATA-5/DATA-6 ingest. `artifact_format.dart`
+  unchanged (its `decode` already populates every field).
+- **Un-pend:** AC-6 row deleted from `test/acceptance/harness/pending.dart`, added
+  to `unpendedACs` in `test/acceptance/pending_gate_test.dart`. No
+  `throwsUnimplementedError` stub to drop (load was already implemented at the
+  shell). No augmentation assigned or newly enabled (AC-6 has no augmentation row).
+- **Unit tests** (`test/data_test.dart`): load == `decode(File(assetPathFor(m)))`
+  for both media (ties `load` to the shipped file); `assetPathFor` returns the
+  per-medium path; memoisation (`identical(load(m), load(m))`, distinct media
+  distinct tables). The existing field/round-trip/parity groups unchanged.
+- **Gates:** `dart analyze lib test` clean; default suite green (148 pass / 14
+  pending-skipped); run-pending red baseline correct — AC-6 now green, the 12
+  still-unbuilt later-phase ACs fail for cause (AC-17/AC-20 pending-but-green as
+  since DATA-8); coverage **12/12 lines** on the only touched lib file
+  `pigment_table.dart` (gate PASS).
+- **Grade gate:** fresh adversarial subagent re-graded all 13 un-pended AC tests
+  → **13 A, 0 downgrades**; AC-6 moves from *green-at-baseline* to a genuinely-live
+  load-from-asset test and stays A. No regression (file-sourced palette is
+  byte-identical to the prior in-memory fixture — parity test enforces it). Band
+  appended to `behavior-test-completeness-pigment-km-engine.md`.
+- **Fix passes:** 0/3 (passed first full run).
+
+**Checkpoint / Handoff.** Verification (repo root, `export PATH="$HOME/development/flutter/bin:$PATH"`):
+`dart analyze lib test` · `dart test` (default, green) ·
+`PIGMENT_KM_RUN_PENDING=true dart test test/acceptance` (red baseline) ·
+`bash tool/coverage_gate.sh <BASE>`. **Frozen interface:**
+`PigmentTable.{load(Medium) [decodes assetPathFor(medium), memoised], assetPathFor(Medium), fromArtifact, medium, pigments, byId}`.
+**For DATA-5/DATA-6:** the real ingest writes `assets/pigments/<medium>.json` and
+points `assetPathFor` at it (the synthetic path must survive or be updated — the
+AC-6 test and the parity test both key off `assetPathFor`/`synthetic_<medium>.json`).
+**Known gap (unchanged):** `load` reads the asset by a path relative to the
+package root (the cwd every consumer and test already assumes); a future
+*published*-package consumer would need package-URI / asset-bundle resolution —
+out of scope while `publish_to: none`. `tool/ingest/` stays untracked DATA-5/6
+material (not staged).
 
 ## Phase 4 — DATA-4: masstone–tint derivation (AC-10)
 
