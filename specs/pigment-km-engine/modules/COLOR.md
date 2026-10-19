@@ -1,9 +1,9 @@
 # Module COLOR — spectrum → colour backend
 
-**Status:** ✅ Done — module complete (COLOR-2 ✅, COLOR-3 ✅)
+**Status:** 🔄 In progress — COLOR-2 ✅, COLOR-3 ✅; **COLOR-4 ⬜ (10° observer re-base — G-9)**
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
-**Owns (files/areas):** `lib/src/colour/spectrum_to_colour.dart`, `lib/src/colour/gamut_map.dart`, `lib/src/colour/cmf_d65_weights.dart` (precomputed x̄·D65, ȳ·D65, z̄·D65 on the canonical grid), `lib/src/colour/oklch.dart`
-**Depends on:** CORE · **Blocks:** FORWARD, STRETCH
+**Owns (files/areas):** `lib/src/colour/spectrum_to_colour.dart`, `lib/src/colour/gamut_map.dart`, `lib/src/colour/cmf_d65_weights.dart` (precomputed x̄·D65, ȳ·D65, z̄·D65 on the canonical grid), `lib/src/colour/oklch.dart`. COLOR-4 additionally edits the **Lab reference white** used for ΔE00 in `lib/src/engine/inverse.dart` (`_d65White`) and the **independent yardstick white** in `test/acceptance/harness/colour_math.dart` — cross-module touches that must be serialized (run COLOR-4 before grading STRETCH-2/3; no concurrent FORWARD/SOLVER/TUNE phase).
+**Depends on:** CORE · **Blocks:** FORWARD, STRETCH; **COLOR-4 blocks** DATA-5, FORWARD-3, TUNE-3 (and the oil fidelity of DATA-6)
 
 ## Dashboard
 
@@ -11,14 +11,18 @@
 |---|---|---|---|---|---|
 | 2 (COLOR-2) | behavior | AC-1 | ✅ Done | 7.64M | 17m 38s |
 | 3 (COLOR-3) | behavior | AC-2 | ✅ Done | 11.82M | 30m 37s |
+| 4 (COLOR-4) | behavior | AC-1 (re-base) + whole-suite re-grade | ⬜ Next | | |
 
 ## Interface reconciliation
 
 Ports the Spectral.js spectrum→XYZ→sRGB + OKLCh gamut-map backend to Dart (design §2, §3.5, MIT — attribute in NOTICE). Precompute the three length-31 weight vectors so spectrum→XYZ is three dot products.
 
+**COLOR-4 (10° re-base, G-9):** the `spectrumToColour`/`gamutMap`/barrel **surface is unchanged** — only the *constants* move from the CIE 1931 2° observer to the CIE 1964 10° observer. Recompute the three `CMF·D65` weight vectors and `yBarD65Sum` from the 10° CMF, and move the **Lab reference white** (`_d65White` in `inverse.dart`, and the independent yardstick white in `colour_math.dart`) from the 2° D65 white `(0.95047, 1.0, 1.08883)` to the 10° D65 white — so XYZ→Lab→ΔE00 is computed in the same observer the Golden/RIT acrylic dataset publishes (D65/10°). The sRGB display matrix + gamma encode stay the standard sRGB ones (display encoding, not a colorimetric observer). This re-grounds AC-1's `refSpectrumColour` published reference and re-runs every colour-dependent AC.
+
 ## Open gates
 
-- **G-2** blocks all behavior phases.
+- **G-2** blocks all behavior phases (resolved 2026-10-16).
+- **G-9** resolved 2026-10-19 (adopt a 10° observer — Matt Quirk) → **implemented by COLOR-4**. Risk carried to G-5: if the MPI oil dataset publishes 2° Lab, DATA-6 oil fidelity must reconcile the observer (render MPI raw spectra through the 10° pipeline, or convert its published Lab) — COLOR-4 adopts 10° globally for the acrylic-first path and does not block on G-5.
 
 ## Phase 2 — COLOR-2: spectrum → colour (AC-1)
 
@@ -78,4 +82,27 @@ OKLCh gamut mapper landed; AC-2 un-pended and green. COLOR module complete.
   - `oklch.dart` exposes `encodeGamma`, `xyzToLinearSrgb`, `linearSrgbToXyz`, `linearSrgbToOklch`, `oklchToLinearSrgb` (library-internal — NOT exported from the `pigment_km` barrel). `spectrum_to_colour.dart` and `gamut_map.dart` both import them.
   - Independent test reference `colour_math.dart` now also exposes `oklchToLinearSrgb` (the acceptance yardstick's own inverse; distinct from the library's — the AC-2 test imports the reference one via the barrel-free harness, the unit test hides it to use the library's).
 - **Verification commands (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"` first. Analyze `dart analyze`; unit `dart test`; coverage `bash tool/coverage_gate.sh <BASE>`; acceptance default `dart test test/acceptance`, red-baseline `PIGMENT_KM_RUN_PENDING=true dart test test/acceptance`. Un-pend = delete the AC row in `pending.dart` **and** add it to `unpendedACs` in `pending_gate_test.dart` **and** drop its stub-throw row in `backends_stub_test.dart`.
-- **Known gaps:** none for AC-1/AC-2. The COLOR module is complete; no further COLOR phases. `gamutMap` is available for any later phase that needs display-safe sRGB (SOLVER out-of-gamut/target handling may reuse it).
+- **Known gaps:** none for AC-1/AC-2. `gamutMap` is available for any later phase that needs display-safe sRGB (SOLVER out-of-gamut/target handling may reuse it). **Superseded by COLOR-4:** the 2° colour basis these phases built is re-based to a 10° observer in COLOR-4 (G-9); AC-1/AC-2 are re-confirmed there against the 10° basis.
+
+## Phase 4 — COLOR-4: 10° observer re-base (AC-1 re-base + whole-suite re-grade)
+
+- **Kind:** behavior · **Target AC:** AC-1 (re-based to the 10° observer) · **Re-grades:** every colour-dependent un-pended AC (see *Augments*)
+- **Depends on:** COLOR-3 (edits the frozen colour files); **G-9 ✅ resolved** (adopt 10°). Soft prerequisite: confirm the MPI oil observer under **G-5** so oil fidelity isn't broken instead (does *not* block — acrylic is the D-2 first medium; the global pipeline goes 10° now).
+- **Blocks:** DATA-5 (AC-7), FORWARD-3 (AC-12), TUNE-3 (AC-21) — their published-colour fidelity needs the 10° basis; and the oil fidelity path of DATA-6 (AC-9).
+- **Files:** `lib/src/colour/cmf_d65_weights.dart` (recompute all three weight vectors + `yBarD65Sum` from the CIE 1964 10° CMF × D65 SPD on the 400–700@10 grid; update the provenance header 2°→10°), `lib/src/colour/spectrum_to_colour.dart` (doc only — surface unchanged; update the "CIE 1931 2°" comment), `lib/src/engine/inverse.dart` (`_d65White` → the 10° D65 reference white for `_xyzToLab`/`deltaE2000Xyz`), `test/acceptance/harness/colour_math.dart` (the independent yardstick's Lab reference white → 10°). Fixture: `refSpectrumColour`'s published colour recomputed for the 10° observer.
+- **Tasks:**
+  1. Source the CIE 1964 10° colour-matching functions and the D65 SPD on the canonical grid (same authoritative source as COLOR-2's 2° data — `colour-science`), fold into `xBar/yBar/zBar·D65`, recompute `yBarD65Sum`; record the 10° range-truncated white point in the header (the 10° perfect-diffuser white over 400–700 nm, analogous to COLOR-2's `(0.9494, 1.0, 1.0871)`).
+  2. Move the Lab reference white in `inverse.dart` and in the acceptance yardstick `colour_math.dart` to the 10° D65 white, so XYZ→Lab→ΔE00 is observer-consistent with the dataset. Keep the sRGB display matrix + gamma unchanged.
+  3. Re-ground the `refSpectrumColour` fixture's published target to its 10° value.
+- **Exit criteria:** `dart analyze` clean; 100% line (+branch by design) on touched executable lines; **`spectrumToColour`/`gamutMap`/barrel public signatures byte-identical** (a reconciliation edit — constants + Lab-white only).
+- **Acceptance gate:** AC-1 re-confirmed green against the 10° `refSpectrumColour` (ΔE00 ≤ 1); whole acceptance suite green (default **and** run-pending `PIGMENT_KM_RUN_PENDING=true`, `@stretch` still excluded); red baseline re-recorded (the pending ACs still fail for the right reason).
+- **Augments (re-grade in fresh independent subagents — the DATA-8 pattern):** re-grade **AC-1** (re-based target) and every un-pended colour-dependent AC whose greenness or grade could move under the new basis — **AC-2** (gamut map), **AC-5** (self-mix/order colour equality), **AC-13** (desaturation chroma inequality), **AC-14** (normalize colour equality), **AC-15** (ΔE00 ranking), **AC-17** (in-gamut ≤5 absolute threshold), **AC-18** (out-of-gamut ΔE00), **AC-22** (chroma-penalty tie detection), **AC-23** (wet/dry L*C*h offset), **AC-25** (A/B ΔE00 report). Relative-only ACs (AC-5/14/15/18/25) are expected to re-confirm A unchanged; absolute-threshold ACs (AC-1/2/13/17/22/23) are the ones to watch. The not-yet-coded fidelity ACs (AC-7/9/12/21) are authored fresh against the 10° basis in their own phases (DATA-5/DATA-6/FORWARD-3/TUNE-3) — not re-graded here.
+- **Test maintenance (anticipate, record in Result):** updating `refSpectrumColour`'s published colour and the two Lab reference whites is *re-grounding the yardstick to the approved observer* (G-9), not weakening any AC — record it with its reason. If `yBarD65Sum`'s exact value changes, the `yBarD65Sum == Σ yBarD65` unit assertion must still hold.
+
+### Result
+
+_(pending — COLOR-4 not yet run.)_
+
+### Checkpoint / Handoff
+
+_(to be written when COLOR-4 completes: the frozen 10° constants + white points, the re-grade outcomes, and the green light for DATA-5/FORWARD-3/TUNE-3.)_
