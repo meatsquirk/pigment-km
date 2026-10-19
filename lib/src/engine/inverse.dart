@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import '../tune/chroma_penalty.dart';
 import '../types/colour_value.dart';
 import '../types/medium.dart';
 import '../types/mix_options.dart';
@@ -28,10 +29,11 @@ import 'forward.dart';
 /// group, no recipe ever spans media (AC-19, design §4.3) — its declared medium
 /// is that group's medium.
 ///
-/// The returned list is ranked by [_byDeltaThenFewerPaints] — best-first by
-/// ΔE00, the simpler (fewer-paint) recipe first on an exact ΔE00 tie (AC-15) —
-/// and truncated to [MixOptions.topK] only after ranking, so the tie-break
-/// decides which recipes survive the cut. An empty [palette] yields no recipes.
+/// The returned list is ranked by [_byCostThenFewerPaints] — best-first by ΔE00,
+/// then (TUNE-2, when [MixOptions.chromaPenalty] is on) the more muted recipe on
+/// a ΔE00 tie, then the simpler (fewer-paint) recipe (AC-15) — and truncated to
+/// [MixOptions.topK] only after ranking, so the tie-break decides which recipes
+/// survive the cut. An empty [palette] yields no recipes.
 List<Recipe> solvePaletteConstrained(
   ColourValue target,
   List<Pigment> palette,
@@ -68,22 +70,35 @@ List<Recipe> solvePaletteConstrained(
       }
     }
   });
-  candidates.sort(_byDeltaThenFewerPaints);
+  // AC-18 — the in/out-of-gamut verdict is a property of the *target*: whether
+  // the best achievable ΔE00 over all candidates lands within the ceiling. It is
+  // read from the true ΔE00 minimum, computed before ranking, so the TUNE-2
+  // chroma tie-break (which may surface an equally-close but more muted recipe
+  // ahead of the strict ΔE00 minimum) can never change whether a target is
+  // reachable — it only reorders the returned recipes.
+  final bestDelta =
+      candidates.map((r) => r.deltaE00).reduce((a, b) => a < b ? a : b);
+
+  // TUNE-2 (AC-22) — the ranking key. On a raw ΔE00 tie the lower-chroma, more
+  // muted recipe is preferred when [MixOptions.chromaPenalty] is on; with it off
+  // (λ = 0) the key is ΔE00 alone, so the penalty never leaks into the raw
+  // ranking. The fewer-paint secondary key (AC-15) still decides a tie the
+  // chroma penalty leaves equal (e.g. identical-reflectance mixes, which share
+  // one colour and so one chroma).
+  final lambda = opts.chromaPenalty ? naturalChromaPenalty : 0.0;
+  candidates.sort((a, b) => _byCostThenFewerPaints(a, b, lambda));
   final ranked = candidates.length <= opts.topK
       ? candidates
       : candidates.sublist(0, opts.topK);
 
-  // AC-18: out-of-gamut is a property of the *target*, not of any one recipe.
-  // The target is reachable only if even the best achievable mix lands within
-  // the in-gamut ceiling [MixOptions.gamutThreshold]; `ranked.first` is that
-  // best (the sort put it there, and the topK cut keeps it). When the best
-  // misses, no mixture of this palette can reach the target, so every returned
-  // recipe is an honest nearest approach — each is flagged and relabelled so
-  // the engine never reports it as a match (SI fixed intent). When the best is
-  // within the ceiling the target is in gamut and the recipes pass unflagged,
-  // so a reachable target's recipes stay `outOfGamut: false` even when a weaker
-  // alternative in the top-K exceeds the ceiling on its own.
-  if (ranked.first.deltaE00 <= opts.gamutThreshold) {
+  // When the best achievable mix misses the ceiling, no mixture of this palette
+  // can reach the target, so every returned recipe is an honest nearest approach
+  // — each is flagged and relabelled so the engine never reports it as a match
+  // (SI fixed intent). When the best is within the ceiling the target is in
+  // gamut and the recipes pass unflagged, so a reachable target's recipes stay
+  // `outOfGamut: false` even when a weaker alternative in the top-K exceeds the
+  // ceiling on its own.
+  if (bestDelta <= opts.gamutThreshold) {
     return ranked;
   }
   return <Recipe>[for (final r in ranked) _flaggedOutOfGamut(r)];
@@ -105,22 +120,30 @@ Recipe _flaggedOutOfGamut(Recipe recipe) => Recipe(
           'out of gamut — nearest ΔE00 ${recipe.deltaE00.toStringAsFixed(2)}',
     );
 
-/// Ranks two candidate recipes best-first: lower ΔE00 wins, and on an **exact**
-/// ΔE00 tie the recipe using fewer paints wins (AC-15 "prefer fewer paints").
+/// Ranks two candidate recipes best-first by their chroma-penalized match cost
+/// (TUNE-2, [chromaPenalizedCost] under [lambda]), then — on a cost tie — the
+/// recipe using fewer paints wins (AC-15 "prefer fewer paints").
 ///
-/// The tie-break fires only when the two ΔE00 are bit-equal, so the ranking
-/// stays strictly monotonic in ΔE00 — two recipes with even minutely different
-/// distances are ordered by distance alone, never reshuffled by paint count. A
-/// genuine tie does occur: mixing identical-reflectance paints yields the same
-/// measured colour at any ratio (the two-constant sum narrows to the spectrum's
-/// Float32 precision in `mixTwoConstant`), so a 1-, 2- and 3-paint recipe can
-/// land on an identical ΔE00 — and the simplest is then preferred. Making the key
-/// explicit guarantees that order independently of the sort's stability and of
-/// the subset-enumeration order, rather than relying on either.
-int _byDeltaThenFewerPaints(Recipe a, Recipe b) {
-  final byDelta = a.deltaE00.compareTo(b.deltaE00);
-  if (byDelta != 0) {
-    return byDelta;
+/// With `lambda == 0` the cost is ΔE00 alone, so this is the pure best-first-by-
+/// ΔE00, fewer-paints-on-tie ranking: strictly monotonic in ΔE00 (two recipes
+/// with even minutely different distances are ordered by distance, never
+/// reshuffled by paint count), with the fewer-paint tie-break firing only on a
+/// bit-equal ΔE00. Such a tie does occur: mixing identical-reflectance paints
+/// yields the same measured colour at any ratio (the two-constant sum narrows to
+/// the spectrum's Float32 precision in `mixTwoConstant`), so a 1-, 2- and
+/// 3-paint recipe can land on an identical ΔE00 — and the simplest is preferred.
+///
+/// With `lambda > 0` (the chroma penalty on) a small `λ·C*` term is added to the
+/// cost, so two recipes within numerical noise on ΔE00 are ordered lower-chroma
+/// first, while the fewer-paint key still decides a pair the chroma term leaves
+/// equal (identical-reflectance mixes share one colour, hence one chroma).
+/// Making the key explicit guarantees the order independently of the sort's
+/// stability and of the subset-enumeration order, rather than relying on either.
+int _byCostThenFewerPaints(Recipe a, Recipe b, double lambda) {
+  final byCost =
+      chromaPenalizedCost(a, lambda).compareTo(chromaPenalizedCost(b, lambda));
+  if (byCost != 0) {
+    return byCost;
   }
   return a.parts.length.compareTo(b.parts.length);
 }

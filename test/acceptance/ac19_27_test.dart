@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+import 'dart:typed_data';
+
 import 'package:pigment_km/pigment_km.dart';
 import 'package:test/test.dart';
 
@@ -214,11 +217,14 @@ void main() {
             reason: 'penalty-off ranking must depend on ΔE00 alone');
       }
 
-      // Find an adjacent pair that TIES on ΔE00 in the plain ranking but differs
-      // in chroma — the only case the penalty is defined to reorder. (SOLVER/
-      // TUNE-2 augmentation adds a constructed guaranteed equal-ΔE00 2-vs-3-paint
-      // tie; this checks every tie the solve naturally produces.)
-      var sawTie = false;
+      // Check every adjacent pair that TIES on ΔE00 in the plain ranking but
+      // differs in chroma — the only case the penalty is defined to reorder.
+      // This natural-tie sweep is a SOFT bonus: the synthetic palette does not
+      // deterministically produce a differing-chroma ΔE00 tie (same as AC-15's
+      // base test), so the GUARANTEED tie — and the decisive assertion that the
+      // penalty reorders it — lives in the constructed-tie test below (the
+      // TUNE-2 augmentation). Where a natural tie does occur, the lower-chroma
+      // member must still rank ahead with the penalty on.
       for (var i = 1; i < plain.length; i++) {
         if ((plain[i].deltaE00 - plain[i - 1].deltaE00).abs() < 1e-9) {
           final loC = plain[i].colour.oklch.c < plain[i - 1].colour.oklch.c
@@ -226,25 +232,149 @@ void main() {
               : plain[i - 1];
           final hiC = identical(loC, plain[i]) ? plain[i - 1] : plain[i];
           if ((hiC.colour.oklch.c - loC.colour.oklch.c).abs() < 1e-9) continue;
-          sawTie = true;
           // WHEN the solver ranks the SAME pair with the penalty enabled …
           final posLo = _indexOfRecipe(penalised, loC);
           final posHi = _indexOfRecipe(penalised, hiC);
           expect(posLo, isNonNegative);
           expect(posHi, isNonNegative);
           // THEN the lower-chroma recipe of the tie ranks ahead of the higher.
-          // Rejects a penalty with no effect (order unchanged) and one that
-          // always dominates ΔE00 (it would also reorder the non-tie pairs,
-          // which the penalty-off monotonicity check above forbids).
           expect(posLo, lessThan(posHi),
               reason: 'the penalty must rank the lower-chroma tie member first');
         }
       }
-      // See the AC-22 augmentation row (TUNE-2): the constructed guaranteed tie
-      // lets this assertion fire deterministically.
-      expect(sawTie, isTrue,
-          reason: 'a ΔE00 tie with a chroma gap must exist to exercise the '
-              'penalty — TUNE-2 constructs one (augmentation)');
+    }, skip: ac('AC-22'));
+
+    test('AC-22 · TestAC22_ChromaPenalty (constructed tie): on a guaranteed '
+        'equal-ΔE00 tie the penalty ranks the muted recipe ahead of the '
+        'fewer-paint vivid one', () {
+      // TUNE-2 augmentation (ITEST *Test augmentations* row TestAC22). The base
+      // test's natural-tie sweep may find no differing-chroma ΔE00 tie in the
+      // synthetic solve; this case GUARANTEES one and makes the decisive
+      // assertion — and, critically, DISCRIMINATES the chroma penalty from the
+      // AC-15 fewer-paints tie-break: the muted recipe here uses MORE paints, so
+      // only a genuine chroma penalty (not "prefer fewer paints") can rank it
+      // first.
+      final engine = customEngine();
+
+      // GIVEN two groups of identical-reflectance twins in one medium. Mixing
+      // identical-reflectance paints yields that group's single colour at any
+      // ratio and paint count (the two-constant sum narrows to Float32
+      // precision), so every all-VIVID subset predicts one vivid colour and
+      // every all-MUTED subset one muted colour — a deterministic pair of
+      // colours, each reachable at several paint counts.
+      //   VIVID: a strong absorption bump → chromatic, higher OKLCh chroma.
+      //   MUTED: a flat absorption → near-neutral, lower OKLCh chroma.
+      final vividK = _bump(peakBin: 9, floor: 0.04, height: 1.6);
+      final mutedK = _flat(0.6);
+      final s = _flat(0.5);
+      final vivid = <Pigment>[
+        for (final id in ['vivid_a', 'vivid_b']) _twin(id, vividK, s),
+      ];
+      final muted = <Pigment>[
+        for (final id in ['muted_a', 'muted_b', 'muted_c']) _twin(id, mutedK, s),
+      ];
+      final palette = <Pigment>[...vivid, ...muted];
+
+      // The two achievable colours (any all-group mix predicts them), read back
+      // through the solver on each group alone.
+      final probe = colourFromSrgb((r: 0.5, g: 0.5, b: 0.5));
+      final vividColour =
+          engine.inverse(probe, vivid, const MixOptions()).first.colour;
+      final mutedColour =
+          engine.inverse(probe, muted, const MixOptions()).first.colour;
+      // Given check: the vivid group really is more chromatic than the muted one
+      // (so the penalty has a muted recipe to prefer), with a clear gap.
+      final cVivid = vividColour.oklch.c;
+      final cMuted = mutedColour.oklch.c;
+      expect(cVivid - cMuted, greaterThan(0.02),
+          reason: 'the vivid group must be measurably more chromatic');
+
+      // Build a target that is EQUIDISTANT (ΔE00) from the two colours, so a
+      // 2-paint vivid recipe and a 3-paint muted recipe tie on the raw match
+      // cost. The solver measures ΔE00 with the library's `deltaE2000Xyz`, so
+      // the search equalises exactly that metric; each group's recipes predict
+      // its colour bit-for-bit, so their recipe ΔE00 equal these distances. The
+      // target is nudged to the vivid side of the crossover, so the vivid recipe
+      // is (infinitesimally) the raw-closer one — the fewer-paint, higher-chroma
+      // "default winner" the penalty must overturn.
+      var lo = 0.0; // T = vividColour: dVivid < dMuted
+      var hi = 1.0; // T = mutedColour: dVivid > dMuted
+      late ColourValue target;
+      late double dVivid;
+      late double dMuted;
+      for (var iter = 0; iter < 100; iter++) {
+        final t = (lo + hi) / 2;
+        final srgb = (
+          r: vividColour.srgb.r + (mutedColour.srgb.r - vividColour.srgb.r) * t,
+          g: vividColour.srgb.g + (mutedColour.srgb.g - vividColour.srgb.g) * t,
+          b: vividColour.srgb.b + (mutedColour.srgb.b - vividColour.srgb.b) * t,
+        );
+        final candidate = colourFromSrgb(srgb);
+        final dv = deltaE2000Xyz(vividColour.xyz, candidate.xyz);
+        final dm = deltaE2000Xyz(mutedColour.xyz, candidate.xyz);
+        if (dv < dm) {
+          lo = t;
+          target = candidate;
+          dVivid = dv;
+          dMuted = dm;
+        } else {
+          hi = t;
+        }
+      }
+      // Given check: the two distances form a genuine ΔE00 tie (within the
+      // 1e-9 the ranking treats as equal) with the vivid side strictly closer,
+      // so the raw ranking puts the vivid recipe first — the penalty, not a
+      // coincidence of distances, is what can move the muted recipe ahead.
+      expect(dMuted - dVivid, greaterThan(0.0),
+          reason: 'the vivid colour must be the raw-closer one');
+      expect(dMuted - dVivid, lessThan(1e-9),
+          reason: 'the two distances must tie within the ranking tolerance');
+
+      final vividIds = {'vivid_a', 'vivid_b'};
+      final mutedIds = {'muted_a', 'muted_b', 'muted_c'};
+
+      // WHEN the full palette is solved with the penalty OFF, then ON (topK big
+      // enough to return every subset, so both recipes are always present).
+      final plain = engine.inverse(
+          target, palette, const MixOptions(topK: 100, chromaPenalty: false));
+      final penalised = engine.inverse(
+          target, palette, const MixOptions(topK: 100, chromaPenalty: true));
+
+      final vividPlain = _indexOfRecipeByIds(plain, vividIds);
+      final mutedPlain = _indexOfRecipeByIds(plain, mutedIds);
+      final vividPen = _indexOfRecipeByIds(penalised, vividIds);
+      final mutedPen = _indexOfRecipeByIds(penalised, mutedIds);
+      expect(vividPlain, isNonNegative,
+          reason: 'the 2-paint vivid recipe must be returned');
+      expect(mutedPlain, isNonNegative,
+          reason: 'the 3-paint muted recipe must be returned');
+      expect(vividPen, isNonNegative);
+      expect(mutedPen, isNonNegative);
+
+      // Given check: the recipes carry the tie and the chroma gap, and the muted
+      // recipe genuinely uses MORE paints (3 vs 2) — so ranking it first cannot
+      // be the fewer-paints rule doing the work.
+      expect((plain[vividPlain].deltaE00 - plain[mutedPlain].deltaE00).abs(),
+          lessThan(1e-9),
+          reason: 'the two recipes must tie on ΔE00');
+      expect(plain[vividPlain].colour.oklch.c,
+          greaterThan(plain[mutedPlain].colour.oklch.c),
+          reason: 'the vivid recipe must be the higher-chroma one');
+      expect(plain[vividPlain].parts.length, 2);
+      expect(plain[mutedPlain].parts.length, 3);
+
+      // THEN with the penalty OFF the raw-closer, fewer-paint VIVID recipe
+      // outranks the muted one (ΔE00-first ranking) …
+      expect(vividPlain, lessThan(mutedPlain),
+          reason: 'penalty-off must rank the raw-closer vivid recipe first');
+      // … and with the penalty ON the muted recipe is promoted ahead of the
+      // vivid one. This REJECTS a no-effect penalty (the vivid recipe would stay
+      // ahead) AND the fewer-paints rule masquerading as a chroma penalty (fewer
+      // paints would keep the 2-paint vivid recipe first; only a real chroma
+      // penalty lifts the 3-paint muted recipe over it).
+      expect(mutedPen, lessThan(vividPen),
+          reason: 'the chroma penalty must rank the muted recipe ahead of the '
+              'fewer-paint vivid one on the tie');
     }, skip: ac('AC-22'));
 
     test('AC-23 · TestAC23_WetDry: the wet/dry toggle shifts the prediction by '
@@ -457,6 +587,53 @@ int _indexOfRecipe(List<Recipe> recipes, Recipe target) {
     if (_partsEqual(recipes[i].parts, target.parts)) return i;
   }
   return -1;
+}
+
+/// The index of the recipe in [recipes] that uses exactly the paint ids [ids],
+/// or -1. The AC-22 constructed tie locates a recipe by its paint SET, not its
+/// fitted fractions: identical-reflectance twins mix to one colour at any ratio,
+/// so the solver keeps arbitrary (equally-good) shares for such a subset.
+int _indexOfRecipeByIds(List<Recipe> recipes, Set<String> ids) {
+  for (var i = 0; i < recipes.length; i++) {
+    if (recipes[i].parts.keys.toSet().length == ids.length &&
+        recipes[i].parts.keys.toSet().containsAll(ids)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/// An identical-reflectance acrylic twin carrying [k] and [s] under [id] — the
+/// AC-22 constructed tie builds two groups of these so each group predicts one
+/// colour at any paint count (design §4.3 two-constant mixing).
+Pigment _twin(String id, Spectrum k, Spectrum s) => Pigment(
+      id: id,
+      name: id,
+      pigmentIndex: 'PW6',
+      medium: Medium.acrylic,
+      k: k,
+      s: s,
+      opacity: 0.5,
+      provenance: Provenance.estimated,
+      sourceRef: 'synthetic:ac22-tie-$id',
+    );
+
+/// A flat spectrum at [value] across the canonical grid.
+Spectrum _flat(double value) =>
+    Float32List.fromList(List<double>.filled(CanonicalGrid.bins, value));
+
+/// A smooth absorption bump: [floor] + [height]·gaussian peaking at [peakBin].
+Spectrum _bump({
+  required int peakBin,
+  required double floor,
+  required double height,
+}) {
+  final out = Float32List(CanonicalGrid.bins);
+  for (var i = 0; i < CanonicalGrid.bins; i++) {
+    final d = (i - peakBin) / 6.0;
+    out[i] = floor + height * math.exp(-d * d);
+  }
+  return out;
 }
 
 /// Order-independent, tolerant equality for two parts maps.

@@ -1,6 +1,6 @@
 # Module TUNE — natural, muted colour
 
-**Status:** Not started
+**Status:** In progress — TUNE-2 ✅ (AC-22 chroma penalty). Next: TUNE-4 (AC-23 wet/dry); TUNE-3 (AC-21) gated on G-3.
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/tune/default_palettes.dart` (curated naturalistic per-medium palettes), `lib/src/tune/chroma_penalty.dart`, `lib/src/tune/wet_dry.dart`
 **Depends on:** SOLVER, DATA · **Blocks:** SIGNOFF-1
@@ -9,7 +9,7 @@
 
 | Phase | Kind | Target AC | Status | Tokens | Time |
 |---|---|---|---|---|---|
-| 2 (TUNE-2) | behavior | AC-22 | ⬜ Todo | | |
+| 2 (TUNE-2) | behavior | AC-22 | ✅ Done | 14.91M | 30m 48s |
 | 3 (TUNE-3) | behavior | AC-21 | ⬜ Todo (G-3 real palette) | | |
 | 4 (TUNE-4) | behavior | AC-23 | ⬜ Todo | | |
 
@@ -28,7 +28,73 @@ Design §7: curated limited real-pigment palette (lever 1, biggest), `chromaPena
 - **Exit criteria:** analyze clean; 100% touched; penalty-on prefers lower chroma on a tie; penalty-off unchanged (control).
 - **Acceptance gate:** un-pend AC-22; `TestAC22_ChromaPenalty` green.
 
-### Result · Checkpoint  <!-- filled on completion -->
+### Result · Checkpoint
+
+**Result (TUNE-2 · AC-22).** The chroma penalty is a tie-break regularizer that
+nudges the solver toward naturalistic, muted recipes without ever trading away
+visible match accuracy.
+- **New module `lib/src/tune/chroma_penalty.dart`** — `naturalChromaPenalty = 1e-6`
+  (λ) and `chromaPenalizedCost(recipe, λ) = recipe.deltaE00 + λ·C*`, where C* is
+  the OKLCh chroma of the recipe's predicted colour (`recipe.colour.oklch.c`, the
+  same chroma measure the §7 natural-colour ceiling uses). With λ=0 the cost is
+  exactly ΔE00, so the penalty is off in the raw ranking.
+- **`inverse.dart` hook** — the ranking comparator `_byDeltaThenFewerPaints`
+  became `_byCostThenFewerPaints(a, b, λ)`: sort by `chromaPenalizedCost(·, λ)`,
+  then (unchanged) fewer paints on a cost tie (AC-15). `solvePaletteConstrained`
+  sets `λ = opts.chromaPenalty ? naturalChromaPenalty : 0.0`. λ is tiny by design:
+  it only reorders recipes within <~1e-6 ΔE00 of each other (a genuine tie), far
+  below a 1-ΔE00 JND, so the raw ΔE00 order of any visibly-different pair is
+  untouched. On a tie the lower C* yields the smaller cost → the more muted recipe
+  ranks first.
+- **Out-of-gamut made penalty-independent.** The AC-18 verdict now reads the true
+  ΔE00 **minimum** over all candidates (`bestDelta`, computed before ranking)
+  instead of `ranked.first.deltaE00`, so the chroma tie-break — which may surface
+  an equally-close but more muted recipe ahead of the strict ΔE00 minimum — can
+  only reorder the returned list, never change whether a target is reachable.
+  (For penalty-off this equals the old value exactly.)
+- **Acceptance.** AC-22 un-pended (row deleted from `pending.dart`; added to
+  `unpendedACs` → TUNE-2). The augmentation (ITEST *TestAC22*) was **closed with**
+  the un-pend: the base test's hard `expect(sawTie, isTrue)` — over-constrained on
+  an absent natural tie — was relaxed to a soft natural-tie sweep plus the live
+  penalty-OFF ΔE00-monotonicity check (AC-15's base/constructed split), and a new
+  **constructed-tie test** guarantees the decisive case: two identical-reflectance
+  twin groups (2-paint VIVID, 3-paint MUTED) in one medium, with a bisected target
+  equidistant in ΔE00; penalty-ON ranks the 3-paint MUTED recipe ahead of the
+  2-paint VIVID one — a reordering a fewer-paints rule cannot produce, so it
+  discriminates the chroma penalty from AC-15's tie-break.
+- **Verification.** `dart analyze` → No issues · `dart test` → **172 passed / 10
+  skipped** (AC-22 skip→2 passing tests + 4 new `chroma_penalty` unit tests) ·
+  acceptance default `dart test test/acceptance` → **26 passed / 10 skipped** ·
+  coverage gate (vs BASE `b0de35f`) → **PASS** (`inverse.dart` 148/148,
+  `chroma_penalty.dart` 2/2; line-only metric, CORE deviation). No exclusive lane
+  (ranking test, in-process shared lane).
+- **Grade gate.** Fresh independent adversarial grader (G1–G6), given the prior
+  grid → **17 A, 0 B, 0 downgrades** (AC-22 A; AC-1..6,8,10,13..20 re-confirmed —
+  the λ=1e-6 penalty only reorders <1e-6-ΔE00 near-ties, which no other un-pended
+  AC asserts on). Grid: *Behaviour re-grade — TUNE-2*.
+- **Augmentations:** TestAC22 closed (above). None newly enabled for other ACs.
+- **Fix passes:** 1/3 (first full acceptance run: the constructed-tie recipes were
+  located by exact parts {0.5,0.5} — but identical-reflectance twins keep the
+  optimizer's arbitrary shares, so switched to locating by paint-id set; an
+  import-ordering lint was fixed before the test run). **Tokens / time:** see
+  dashboard.
+
+**Checkpoint / Handoff.**
+- **Frozen interface:** `lib/src/tune/chroma_penalty.dart` — `naturalChromaPenalty`
+  (λ=1e-6) and `chromaPenalizedCost(Recipe, double)`; imported by `inverse.dart`
+  only, **not** exported from the barrel (a solver-internal tuning helper). The
+  engine surface (`CustomKmEngine.inverse`, `MixOptions.chromaPenalty`) is
+  unchanged. `MixOptions.chromaPenalty` defaults to `true` (penalty on).
+- **Verification commands (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"`
+  first. `dart analyze`; `dart test`; coverage `bash tool/coverage_gate.sh <BASE>`;
+  acceptance default `dart test test/acceptance`.
+- **Gotchas for later TUNE phases:** (1) the chroma penalty is a tie-break only
+  (λ tiny) — a wet/dry or curated-palette phase that asserts a specific `.first`
+  recipe should not assume strict ΔE00-min ordering under the default (penalty on);
+  (2) locating a twin-subset recipe must be by **paint-id set**, not fitted
+  fractions (identical reflectance → arbitrary equally-good shares). TUNE-3 (AC-21)
+  is gated on G-3 (real Zorn-style acrylic palette + hardened chroma ceiling);
+  TUNE-4 (AC-23 wet/dry) is startable.
 
 ## Phase 3 — TUNE-3: curated default palette (AC-21) — real palette needs G-3
 
