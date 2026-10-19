@@ -601,3 +601,31 @@ Mutations (each restored byte-identical; AC-26 re-green after each): (1) `out[i]
 opaque reuse → FAIL; (2) `a − rg`→`a + rg` → FAIL; (3) drop `y ≥ cothSaturation`
 clamp → FAIL (control). No correctness bug found; implementation matches design §3.4
 and the X→∞ ⇒ R∞ = a−b = kmReflectance(K/S) reduction was verified algebraically.
+
+## Behaviour grade — STRETCH-3 (un-pended AC-27) · graded 2026-10-19
+
+**AC-27 = A (fixed in-phase, fix pass 1/3; 1 new test graded; the 22 prior un-pended
+ACs — AC-1…AC-8, AC-10, AC-13…AC-20, AC-22…AC-26 — are byte-identical and not
+re-graded: STRETCH-3 adds a new module `lib/src/stretch/metamerism.dart` that
+nothing else imports, and touches only the AC-27 test + the pending-gate mirror
+maps + the barrel export).** Fresh independent adversarial grader, G1–G6, with
+required library mutations (each restored, re-verified green).
+
+`TestAC27_Metamerism` (@stretch) drives `assessMetamerism` through the public barrel.
+
+| G | Finding |
+|---|---|
+| G1 | Two distinct illuminants and a valid, spectrally-different second recipe asserted through the public surface before the When; "equal under D65" is read from the public `deltaE00Reference` output after the When (necessarily — it is a distinct field from the index/flag under test) and before the Thens. |
+| G2 | Illuminants are real Planckian SPD fixtures; the metameric black is built only via the public `spectrumToColour`; index + flag come from the real `assessMetamerism`, no test-side override. |
+| G3 | Fragile flag shown to change (robust `isFalse` vs fragile `isTrue`); the negative "not fragile" reading is paired with a control (the illuminant-stable poor match) whose test-light error is large yet flag is off — the reading can move both ways. |
+| G4 | Relative ordering `fragile.index > robust.index` matches "higher index"; exact grains `dRef < 1e-3`, equal-within-`1e-3`, `singleIlluminant.index < 1e-6`, both flags asserted with reasons. |
+| G5 | **B→A, fixed in-phase.** Initial grade B: with both primary recipes at ΔE_ref≈0, a wrong `index = ΔE_test` (the AC's own "one illuminant only" reject, test-light direction) sneaked past — the single-illuminant control (`test==reference ⇒ 0`) caught only a *reference*-only index. Fix: added a poor-but-illuminant-STABLE control (same shape ×0.7: ΔE_ref≈7.9, degradation≈0) asserting *not fragile* despite a large test-light error. Now rejects `index = ΔE_test`. |
+| G6 | AC-27 only (AC-26 is a separate test; the stable control still asserts only AC-27's index/flag). |
+
+Mutations (each restored byte-identical; AC-27 re-green after each): (a) `index =
+max(0, dRef)` reference-only → FAIL; (b) `_labUnder` ignores illum (`m = 1.0`) →
+FAIL; (c) invert flag `index <= threshold` → FAIL; (d) drop von-Kries white norm
+(constant divisor) → FAIL; (e) `index = max(0, dTest)` test-only → **FAIL after the
+fix** (PASS before it — the finding). No correctness bug found; `index = max(0,
+ΔE_test − ΔE_ref)` is the correct degradation measure and the observer-reweight +
+per-illuminant von-Kries adaptation are sound.

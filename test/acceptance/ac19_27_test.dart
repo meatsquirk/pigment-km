@@ -584,29 +584,204 @@ void main() {
 
     test('AC-27 · TestAC27_Metamerism: illuminant-fragile matches are flagged '
         'with a metamerism index', () {
-      // SCOPE GATE (G-7 open): multi-illuminant metamerism (design §9) is an
-      // optional S6 scenario. Its public metamerism-index + illuminant-fragility
-      // API is intentionally NOT frozen until G-7 approves the scope and
-      // STRETCH-3 adds it. The `illuminants` fixture (d65 + warm) is already
-      // present for it. This placeholder fails here on its scope precondition;
-      // STRETCH-3 replaces the body with the scenario below:
-      //   GIVEN  two recipes that match a target equally under D65 (assert equal
-      //          D65 ΔE00).
-      //   WHEN   they are evaluated under D65 and a warm studio illuminant.
-      //   THEN   the recipe whose match degrades under the studio illuminant is
-      //          assigned the higher metamerism index, and the engine warns that
-      //          that match is illuminant-fragile.
-      //   REJECTS an index computed under one illuminant only.
-      expect(_stretchScopeApproved, isTrue,
-          reason: 'AC-27 metamerism is @stretch — gated behind G-7; STRETCH-3 '
-              'freezes the multi-illuminant API and un-pends this');
+      // Un-pended by STRETCH-3 (G-7 ✅ Build STRETCH). Driven through the frozen
+      // metamerism API `assessMetamerism` (design §9), public surface only.
+      //
+      // The two recipes are built as reflectance spectra over the SAME target:
+      //   A (robust)  = the target spectrum itself — a spectral (non-metameric)
+      //                 match that holds under every light.
+      //   B (fragile) = the target plus a METAMERIC BLACK δ — a perturbation
+      //                 that leaves the D65 tristimulus unchanged (so B matches
+      //                 the target exactly under D65) but shifts the colour
+      //                 under a warmer light. δ is built using the PUBLIC
+      //                 `spectrumToColour` only: its XYZ is linear in the
+      //                 spectrum, so impulse spectra recover the three XYZ weight
+      //                 rows, and δ is the component of a seed perturbation
+      //                 orthogonal to all three (Gram–Schmidt) — hence Mδ = 0.
+      final target =
+          Float32List.fromList(List<double>.filled(CanonicalGrid.bins, 0.5));
+      final delta = _metamericBlack(
+          List<double>.generate(CanonicalGrid.bins, (i) => math.sin(i * 0.9) * 0.45));
+      final fragileRecipe = Float32List(CanonicalGrid.bins);
+      for (var i = 0; i < CanonicalGrid.bins; i++) {
+        fragileRecipe[i] = target[i] + delta[i];
+      }
+
+      // Given checks.
+      // The fixture genuinely provides two distinct illuminants, so the test is
+      // actually multi-illuminant (rejects a one-light evaluation at the source).
+      expect(illuminants.d65.length, CanonicalGrid.bins);
+      expect(illuminants.warm.length, CanonicalGrid.bins);
+      var sawIlluminantDifference = false;
+      for (var i = 0; i < CanonicalGrid.bins; i++) {
+        if ((illuminants.d65[i] - illuminants.warm[i]).abs() > 1e-6) {
+          sawIlluminantDifference = true;
+        }
+      }
+      expect(sawIlluminantDifference, isTrue,
+          reason: 'D65 and the warm studio illuminant must differ');
+      // B is a genuine, physical SECOND recipe: a valid reflectance in (0,1]
+      // that is spectrally different from the target (not a copy of recipe A).
+      var sawSpectralDeparture = false;
+      for (var i = 0; i < CanonicalGrid.bins; i++) {
+        expect(fragileRecipe[i], greaterThan(0.0));
+        expect(fragileRecipe[i], lessThanOrEqualTo(1.0));
+        if ((fragileRecipe[i] - target[i]).abs() > 1e-3) {
+          sawSpectralDeparture = true;
+        }
+      }
+      expect(sawSpectralDeparture, isTrue,
+          reason: 'the fragile recipe must differ spectrally from the target');
+
+      // WHEN each recipe is evaluated under D65 and a warm studio illuminant.
+      final robust = assessMetamerism(
+        target: target,
+        candidate: target,
+        referenceIlluminant: illuminants.d65,
+        testIlluminant: illuminants.warm,
+      );
+      final fragile = assessMetamerism(
+        target: target,
+        candidate: fragileRecipe,
+        referenceIlluminant: illuminants.d65,
+        testIlluminant: illuminants.warm,
+      );
+
+      // Given check (the scenario's "match a target equally under D65"): both
+      // recipes match the target under D65 to within ΔE00 1e-3, and equally so —
+      // the metameric black makes B's D65 match as perfect as A's spectral one.
+      expect(robust.deltaE00Reference, lessThan(1e-3),
+          reason: 'the spectral match is exact under D65');
+      expect(fragile.deltaE00Reference, lessThan(1e-3),
+          reason: 'the metamer matches the target under D65');
+      expect((fragile.deltaE00Reference - robust.deltaE00Reference).abs(),
+          lessThan(1e-3),
+          reason: 'the two recipes must match the target EQUALLY under D65');
+
+      // THEN the recipe whose match degrades under the warm studio illuminant is
+      // assigned the higher metamerism index …
+      expect(fragile.index, greaterThan(robust.index),
+          reason: 'the degrading recipe must get the higher metamerism index');
+      // … and the engine warns that that match is illuminant-fragile, while the
+      // robust spectral match is NOT flagged (a control proving the flag can be
+      // off — not everything is called fragile).
+      expect(fragile.illuminantFragile, isTrue,
+          reason: 'the degrading match must be flagged illuminant-fragile');
+      expect(robust.illuminantFragile, isFalse,
+          reason: 'the spectral match must not be flagged fragile');
+
+      // REJECTS an index computed under one illuminant only. Under the reference
+      // light ALONE the two recipes are indistinguishable (both match the target
+      // to ~0), so the fragile recipe's positive index cannot come from the
+      // reference render — it only appears once the warm light is applied. Made
+      // decisive by evaluating B with the test light SET EQUAL to the reference:
+      // a single-illuminant assessment yields index 0 and no warning, so an index
+      // that ignored the test illuminant could never flag this match.
+      final singleIlluminant = assessMetamerism(
+        target: target,
+        candidate: fragileRecipe,
+        referenceIlluminant: illuminants.d65,
+        testIlluminant: illuminants.d65,
+      );
+      expect(singleIlluminant.index, lessThan(1e-6),
+          reason: 'under one illuminant the metamer shows no degradation');
+      expect(singleIlluminant.illuminantFragile, isFalse,
+          reason: 'a one-illuminant index cannot flag an illuminant-fragile '
+              'match — the warning requires the second light');
+
+      // CONTROL — the index is the *degradation* (test minus reference), not the
+      // absolute test-light error. A recipe that matches the target POORLY but
+      // in an illuminant-STABLE way (same spectral shape, uniformly darker) is a
+      // bad match under BOTH lights equally: its mismatch does not grow under
+      // the warm light, so it is NOT illuminant-fragile. This REJECTS an index
+      // computed from the test illuminant alone (`index = ΔE_test`), the other
+      // half of the AC's "one illuminant only" reject: such an index would be
+      // large here and wrongly raise the fragility warning.
+      final stableRecipe = Float32List(CanonicalGrid.bins);
+      for (var i = 0; i < CanonicalGrid.bins; i++) {
+        stableRecipe[i] = target[i] * 0.7;
+      }
+      final stable = assessMetamerism(
+        target: target,
+        candidate: stableRecipe,
+        referenceIlluminant: illuminants.d65,
+        testIlluminant: illuminants.warm,
+      );
+      // Given check: it is a genuinely poor match under D65 …
+      expect(stable.deltaE00Reference, greaterThan(5.0),
+          reason: 'the stable control must match the target poorly under D65');
+      // … and its test-light error is large too — large enough that a test-only
+      // index would exceed the fragility threshold and raise the warning.
+      expect(stable.deltaE00Test, greaterThan(defaultMetamerismFragileThreshold),
+          reason: 'the stable control is a poor match under the warm light too');
+      // THEN the degradation is ~0 and the match is NOT flagged fragile: a bad
+      // but illuminant-stable match must not trip the metamerism warning.
+      expect(stable.index, lessThan(defaultMetamerismFragileThreshold),
+          reason: 'an illuminant-stable mismatch does not degrade across lights');
+      expect(stable.illuminantFragile, isFalse,
+          reason: 'a poor but illuminant-stable match must NOT be flagged '
+              'fragile — the index is degradation, not absolute test-light error');
     }, tags: 'stretch', skip: ac('AC-27'));
   });
 }
 
-/// Whether the optional S6 (STRETCH) scope has been approved at G-7. False until
-/// the gate resolves; STRETCH-2/3 flip the real behaviour on once it does.
-const bool _stretchScopeApproved = false;
+/// The metameric-black component of [seed]: the part of the length-[bins]
+/// perturbation that is orthogonal (under the plain dot product) to the three
+/// XYZ weight rows of the D65 colour pipeline, so adding it to a spectrum leaves
+/// that spectrum's D65 tristimulus unchanged. The weight rows are recovered
+/// through the PUBLIC `spectrumToColour` alone: its XYZ is linear in the input,
+/// so `spectrumToColour(eᵢ).xyz` is the i-th column of the XYZ matrix, i.e. the
+/// weight each row gives bin i. Gram–Schmidt removes the seed's components along
+/// those three rows.
+List<double> _metamericBlack(List<double> seed) {
+  const n = CanonicalGrid.bins;
+  final rows = <List<double>>[
+    List<double>.filled(n, 0),
+    List<double>.filled(n, 0),
+    List<double>.filled(n, 0),
+  ];
+  for (var i = 0; i < n; i++) {
+    final e = Float32List(n);
+    e[i] = 1.0;
+    final xyz = spectrumToColour(e).xyz;
+    rows[0][i] = xyz.x;
+    rows[1][i] = xyz.y;
+    rows[2][i] = xyz.z;
+  }
+  double dot(List<double> a, List<double> b) {
+    var s = 0.0;
+    for (var i = 0; i < n; i++) {
+      s += a[i] * b[i];
+    }
+    return s;
+  }
+
+  // Orthonormalize the three rows.
+  final basis = <List<double>>[];
+  for (final row in rows) {
+    final v = List<double>.from(row);
+    for (final b in basis) {
+      final p = dot(v, b);
+      for (var i = 0; i < n; i++) {
+        v[i] -= p * b[i];
+      }
+    }
+    final norm = math.sqrt(dot(v, v));
+    for (var i = 0; i < n; i++) {
+      v[i] /= norm;
+    }
+    basis.add(v);
+  }
+  // Remove the seed's components along the basis → Mδ = 0.
+  final delta = List<double>.from(seed);
+  for (final b in basis) {
+    final p = dot(delta, b);
+    for (var i = 0; i < n; i++) {
+      delta[i] -= p * b[i];
+    }
+  }
+  return delta;
+}
 
 /// A ~15-paint single-medium palette for the performance budget (AC-20), built
 /// by cloning the synthetic acrylic paints under distinct ids. Caller-supplied

@@ -1,7 +1,7 @@
 # Master Plan — pigment_km: measured-pigment Kubelka–Munk mixing engine
 
 **Spec:** [pigment-km-engine.feature](../pigment-km-engine.feature)
-**Status:** In progress — STRETCH-2 ✅ (AC-26 §3.4 finite-thickness glazing, A). Next **STRETCH-3** (AC-27 metamerism, G-7 ✅) and **TUNE-3** (real palette in hand). FORWARD-3 needs real mixtures + G-5 k1,k2; DATA-6 on G-4 + oil observer; DATA-7 on G-3 wording. 22 ACs un-pended / 5 pending.
+**Status:** In progress — STRETCH complete (STRETCH-3 ✅ AC-27 metamerism, A; STRETCH-2 ✅ AC-26 glazing, A). Every startable behavior phase is done; **SIGNOFF-1** is the only remaining phase and still waits on the gate-blocked TUNE-3 (G-3), FORWARD-3 (G-3/4/5), DATA-6 (G-4), DATA-7 (G-3). 23 ACs un-pended / 4 pending.
 **Architecture:** [Nuance/docs/custom-mixing-engine-design.md](../../../Nuance/docs/custom-mixing-engine-design.md) (physics §3, datasets §4, forward/inverse §6, tuning §7, staged plan §8, licensing §13) · [Nuance/docs/paint-color-app-solution-intent.md](../../../Nuance/docs/paint-color-app-solution-intent.md) (D3/D6/D7/D9, accuracy NFRs) · consumption contract: `Nuance/lib/recipes/engine/mixing_engine.dart` (bs-04)
 **Code home:** `/Users/matthew.quirk/pigment_km` · remote `https://github.com/meatsquirk/pigment-km` (origin, pushed) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
 
@@ -81,7 +81,7 @@ Greenfield — nothing exists yet; every AC is net-new. The gap is the whole lib
 | AC-24 | Recipes from measured data are Calculated, user tubes Measured | ITEST-4 `TestAC24_Provenance` | PROD-2 | ✅ |
 | AC-25 | The measured-pigment engine and a baseline engine are interchangeable | ITEST-4 `TestAC25_ABEngines` | PROD-3 | ✅ |
 | AC-26 | A glaze over a ground predicts via the layering equation | ITEST-4 `TestAC26_Glazing` (@stretch) | STRETCH-2 | ✅ |
-| AC-27 | Illuminant-fragile matches are flagged with a metamerism index | ITEST-4 `TestAC27_Metamerism` (@stretch) | STRETCH-3 | ⬜ Todo (G-7) |
+| AC-27 | Illuminant-fragile matches are flagged with a metamerism index | ITEST-4 `TestAC27_Metamerism` (@stretch) | STRETCH-3 | ✅ |
 
 ## Design decisions
 
@@ -168,7 +168,7 @@ Pre-seeded augmentations: AC-7/AC-11/AC-21 strengthened by DATA-5/DATA-7/TUNE-3 
 | SOLVER | [modules/SOLVER.md](modules/SOLVER.md) | `inverse()` palette-constrained solver | FORWARD | ✅ Done (SOLVER-2..7) |
 | TUNE | [modules/TUNE.md](modules/TUNE.md) | Natural-colour tuning: curated palette, chromaPenalty, wet/dry | SOLVER, DATA | 🔄 In progress (TUNE-2 ✅, TUNE-4 ✅; TUNE-3 ↔ G-3) |
 | PROD | [modules/PROD.md](modules/PROD.md) | Provenance wiring, baseline engine + A/B, interface freeze | SOLVER | ✅ Done (PROD-2 ✅, PROD-3 ✅) |
-| STRETCH | [modules/STRETCH.md](modules/STRETCH.md) | Finite-layer glazing, metamerism (G-7 ✅ build) | FORWARD, COLOR | 🔄 In progress (STRETCH-2 ✅; STRETCH-3 startable) |
+| STRETCH | [modules/STRETCH.md](modules/STRETCH.md) | Finite-layer glazing, metamerism (G-7 ✅ build) | FORWARD, COLOR | ✅ Done (STRETCH-2 ✅ AC-26; STRETCH-3 ✅ AC-27) |
 | ITEST | [modules/ITEST.md](modules/ITEST.md) | Acceptance integration suite: one pending test per AC, and its review | CORE, DATA shells | ✅ Done (ITEST-1..5; G-2 approved 2026-10-16) |
 
 ## Dependency graph
@@ -256,20 +256,19 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 | 33 | PROD-2 | AC-24 provenance | ✅ Done | 7.07M | 12m 45s | AC-24 un-pended & green; recipe tier = weakest input (estimated<calculated<measured<confirmed); new `engine/provenance.dart`; dataset→Calculated, user tube→Measured; 19 A re-grade, 0 downgrades; cov 146/146·9/9; fix 0/3; DATA-7 dep was drift |
 | 34 | PROD-3 | AC-25 A/B engines | ✅ Done | 11.30M | 18m 43s | AC-25 un-pended & green; single-constant `SpectralBaselineEngine` (mixes per-λ K/S ratios, vs two-constant's separate Kmix/Smix) behind the now-frozen `MixingEngine`; new `ab/ab_harness.dart` (`ABHarness`/`ABReport`); barrel export; 20 A re-grade, 0 downgrades; cov 117/117·24/24; fix 0/3; module PROD done |
 | 35 | STRETCH-2 | AC-26 glazing | ✅ Done | 6.86M | 13m 23s | AC-26 un-pended & green; new `stretch/glazing.dart` — §3.4 finite-thickness KM layering `glazedReflectance(glaze,X,ground)`, X→∞ reduces to the opaque form; cov 21/21; A (3 mutations caught); fix 0/3 |
-| 36 | STRETCH-3 | AC-27 metamerism | ⬜ Next | | | G-7 ✅ — startable (also TUNE-3) |
-| 37 | SIGNOFF-1 | sign-off: packet + summary + manual approval | ⬜ Todo | | | |
+| 36 | STRETCH-3 | AC-27 metamerism | ✅ Done | 11.46M | 22m 49s | AC-27 un-pended & green; new `stretch/metamerism.dart` — `assessMetamerism` renders a target+candidate under D65 + a warm light, `index = max(0, ΔE_test − ΔE_ref)`, warns illuminant-fragile; AC-27 test builds a metameric black via public `spectrumToColour`; cov 44/44; A (B→A fixed in-phase, G5: added an illuminant-stable poor-match control that rejects a test-only index); fix 1/3; module STRETCH done |
+| 37 | SIGNOFF-1 | sign-off: packet + summary + manual approval | ⬜ Next | | | gate-blocked: waits on TUNE-3/FORWARD-3/DATA-6/DATA-7 (or their acceptance as gaps) |
 | 38 | COLOR-4 | 10° observer re-base (AC-1 re-base + whole-suite re-grade) — G-9 | ✅ Done | 14.90M | 30m 47s | 10° weights + Lab white (incl. wet_dry.dart); AC-1 ΔE00 0.084; suite green; 22 A; unblocks DATA-5/FORWARD-3/TUNE-3; COLOR module ✅ |
 
 *Tokens* / *Time* = phase totals from the *Token usage* ledger (Time = active, wall in brackets), filled when a row is marked done.
 
 ## Next phase
 
-**STRETCH-2 done 2026-10-19 (AC-26):** finite-thickness glazing shipped as `lib/src/stretch/glazing.dart` — `glazedReflectance({KmMix glaze, double thickness, Spectrum ground})`, the §3.4 single-layer KM equation over the two-constant mix; reduces to the opaque body reflectance (`kmReflectance`) as X→∞ and to the bare ground as X→0. AC-26 un-pended & green; 12-test unit suite; cov 21/21; grade A (3 adversarial mutations caught, incl. the named opaque-form-reuse Reject); 0 fixes. 22 ACs un-pended / 5 pending.
+**STRETCH-3 done 2026-10-19 (AC-27):** multi-illuminant metamerism shipped as `lib/src/stretch/metamerism.dart` — `assessMetamerism({target, candidate, referenceIlluminant, testIlluminant, fragileThreshold})` → `MetamerismAssessment{deltaE00Reference, deltaE00Test, index, illuminantFragile}`; the index is the match *degradation* `max(0, ΔE_test − ΔE_ref)`, rendering each reflectance under each illuminant by reweighting the baked observer×D65 product by the illuminant SPD ratio + per-illuminant von-Kries white (no new reference data). AC-27 un-pended & green; 16-test unit suite; cov 44/44; grade A (B→A fixed in-phase, fix pass 1/3 — added an illuminant-stable poor-match control that rejects a test-illuminant-only index). **STRETCH module complete.** 23 ACs un-pended / 4 pending.
 
-- **⬜ Next: STRETCH-3 (AC-27 metamerism)** — G-7 ✅, own session. Build `lib/src/stretch/metamerism.dart`; the `illuminants` fixture (d65 + warm placeholder) is staged; remove the now-stale `_stretchScopeApproved` const in `ac19_27_test.dart`. After it, SIGNOFF-1 is the only phase left.
-- **Also startable (own session):** TUNE-3 (AC-21 curated palette) using the shipped real `acrylic.json` — confirm whether it also needs DATA-7's finalized attribution wording first.
-- **Still gate-blocked:** FORWARD-3 (AC-12) needs real measured *mixtures* (the Golden drawdowns are single paints — G-3/G-4) **and** the confirmed acrylic k1,k2 (G-5 mixing half); DATA-6 (AC-9) on **G-4** + the MPI oil observer (**G-5** — D-14 risk); DATA-7 (AC-11) on **G-3** attribution wording (must also point the real-source provenance path at the shipped Calculated table); G-6 adds AC-17 held-out validation *evidence*.
-- **SIGNOFF-1** waits on DATA-6/7, FORWARD-3, TUNE-3, STRETCH-3.
+- **⬜ Next: SIGNOFF-1 — but gate-blocked, not startable.** It is the only remaining phase, yet the feature cannot be signed off while 4 ACs are still pending behind their gates. Each needs its gate (or an explicit accept-as-gap decision) before SIGNOFF-1 can close the feature.
+- **Still gate-blocked (the 4 pending ACs):** TUNE-3 (AC-21 curated palette) on **G-3** attribution/palette (uses the shipped real `acrylic.json`); FORWARD-3 (AC-12) needs real measured *mixtures* (the Golden drawdowns are single paints — G-3/G-4) **and** the confirmed acrylic k1,k2 (G-5 mixing half); DATA-6 (AC-9) on **G-4** + the MPI oil observer (**G-5** — D-14 risk); DATA-7 (AC-11) on **G-3** attribution wording. G-6 adds AC-17 held-out validation *evidence*.
+- **SIGNOFF-1** waits on TUNE-3, FORWARD-3, DATA-6, DATA-7 (or a human decision to accept those ACs as documented gaps).
 
 ## Token usage
 
@@ -314,7 +313,8 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 | COLOR-4 | 305fd8fc | 2026-10-19 10:04 EDT | 10:34 | 30m 47s | 30m 47s | claude-opus-4-8 | 198 | 306,176 | 14,530,269 | 63,497 | 14,900,140 | 10° observer re-base (G-9/D-14): weights+yBarD65Sum+Lab white (inverse/wet_dry/yardstick); AC-1 ΔE00 0.084; suite green; coverage PASS; 22 A / 0 B; fix 0/3 |
 | DATA-5 | 0a142311 | 2026-10-19 11:52 EDT | 13:03 | 1h 10m | 31m 26s | claude-opus-4-8 | 212 | 342,795 | 17,005,101 | 113,716 | 17,461,824 | AC-7 un-pended & green; real Golden/RIT acrylic.json shipped (78 paints); round-trip ≤0.1445 ΔE00 (0/78>0.5); 21 A re-grade; fix 0/3 |
 | STRETCH-2 | 783128f1 | 2026-10-19 15:46 EDT | 16:00 | 13m 23s | 13m 23s | claude-opus-4-8 | 136 | 179,174 | 6,631,881 | 47,394 | 6,858,585 | AC-26 glazing un-pended & green; grade A; cov 21/21; fix 0/3 |
-| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-19 16:00** | **17h 29m** | **10h 04m** |  | **4,816** | **7,892,577** | **281,563,569** | **2,076,306** | **291,537,268** |  |
+| STRETCH-3 | 535f3aee | 2026-10-19 17:47 EDT | 18:10 | 22m 49s | 22m 49s | claude-opus-4-8 | 192 | 242,251 | 11,140,540 | 78,218 | 11,461,201 | AC-27 metamerism un-pended & green; grade A (B→A fixed in-phase, fix 1/3); cov 44/44; module STRETCH done |
+| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-19 18:10** | **17h 52m** | **10h 27m** |  | **5,008** | **8,134,828** | **292,704,109** | **2,154,524** | **302,998,469** |  |
 
 ## Sign-off
 

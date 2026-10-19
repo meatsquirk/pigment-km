@@ -16,7 +16,6 @@ const Map<String, String> pendingACs = <String, String>{
   'AC-11': 'DATA-7',
   'AC-12': 'FORWARD-3',
   'AC-21': 'TUNE-3',
-  'AC-27': 'STRETCH-3',
 };
 
 /// The closed set of behaviour phase names the build order defines — the only
