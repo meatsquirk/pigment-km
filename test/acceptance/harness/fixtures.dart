@@ -1,15 +1,19 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:pigment_km/pigment_km.dart';
 
+import 'acrylic_published_data.dart';
+import 'colour_math.dart';
+
 /// The acceptance fixtures (design §4.3, §6.2; master-plan test plan).
 ///
 /// Every fixture is test *input* data, built so the per-AC tests (ITEST-2/3/4)
-/// share one honest set of paints, spectra and targets. The three real-data
-/// fixtures ([acrylicPublishedPlaceholder], [oilMixturesPlaceholder],
-/// [illuminants]) are explicit placeholders until their datasets land (G-3
-/// acrylic, G-4 oil, G-7 stretch); each carries a flag so the AC tests that
+/// share one honest set of paints, spectra and targets. The real-data fixtures
+/// ([acrylicPublished] — real since DATA-5 — plus [oilMixturesPlaceholder] and
+/// [illuminants], still placeholders until their datasets land: G-4 oil, G-7
+/// stretch) each carry an `isReal`/`isPlaceholder` flag so the AC tests that
 /// depend on them assert a precondition naming the owning gate/phase.
 
 /// `synthPigments` — the hand-authored synthetic acrylic paints (opaque white,
@@ -48,20 +52,36 @@ const ColourValue oogColour = ColourValue(
   oklch: (l: 0.86644, c: 0.29483, h: 142.495),
 );
 
-/// `acrylicPublished` (AC-7, AC-12, AC-21) — the real Golden/RIT paints with
-/// their published colours. Placeholder until G-3/DATA-5: [isReal] is false and
-/// [published] is null; the acrylic AC tests assert their precondition and run
-/// against [synthPigments] (graded *B pending <phase>*) until the data lands.
+/// `acrylicPublished` (AC-7, AC-12, AC-21) — the real Golden/RIT acrylic paints
+/// with their published colours. **Landed by DATA-5 (2026-10-19):** [table] is
+/// the shipped `assets/pigments/acrylic.json` artifact (78 Golden HB drawdowns,
+/// K = K/S with S ≡ 1, provenance Calculated) and [published] maps each paint id
+/// to its published D65/10° colour (from [acrylicPublishedLab] via the harness
+/// yardstick), so [isReal] is true. Note this is a **separate** artifact from the
+/// synthetic solver palette ([synthPigments], still `PigmentTable.load(acrylic)`):
+/// the controlled synthetic paints drive the in-gamut solver ACs (AC-13..18),
+/// the real table drives the fidelity ACs (AC-7 here; AC-12/AC-21 later).
 typedef AcrylicPublished = ({
   PigmentTable table,
   Map<String, ColourValue>? published,
   bool isReal,
 });
 
-final AcrylicPublished acrylicPublishedPlaceholder = (
-  table: PigmentTable.load(Medium.acrylic),
-  published: null,
-  isReal: false,
+/// Decodes the shipped real acrylic artifact (not via `load(Medium.acrylic)`,
+/// which is the synthetic placeholder palette the solver ACs depend on).
+PigmentTable _realAcrylicTable() => PigmentTable.fromArtifact(
+      PigmentArtifactCodec.decode(
+        File('assets/pigments/acrylic.json').readAsStringSync(),
+      ),
+    );
+
+final AcrylicPublished acrylicPublished = (
+  table: _realAcrylicTable(),
+  published: <String, ColourValue>{
+    for (final e in acrylicPublishedLab.entries)
+      e.key: colourFromLab(e.value.l, e.value.a, e.value.b),
+  },
+  isReal: true,
 );
 
 /// `oilMixtures` (AC-9) — the MPI pure + mixture reflectances with known ratios

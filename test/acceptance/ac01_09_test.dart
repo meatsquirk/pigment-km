@@ -303,9 +303,9 @@ void main() {
       // licensed Golden/RIT data and its published colours on disk. Until
       // G-3/DATA-5, the acrylicPublished fixture is an explicit placeholder
       // (isReal=false, published=null), so the test fails here naming its owner.
-      expect(acrylicPublishedPlaceholder.isReal, isTrue,
+      expect(acrylicPublished.isReal, isTrue,
           reason: 'AC-7 needs the real Golden/RIT acrylic data + published colours — G-3/DATA-5');
-      expect(acrylicPublishedPlaceholder.published, isNotNull,
+      expect(acrylicPublished.published, isNotNull,
           reason: 'AC-7 asserts ΔE00(rendered, published) ≤ 0.5 for every paint — G-3/DATA-5');
 
       // WHEN each paint's K,S are rendered to its opaque reflectance
@@ -313,8 +313,8 @@ void main() {
       // THEN the rendered colour reproduces the dataset's published colour for
       // that paint within ΔE00 ≤ 0.5. (DATA-5 augments this from the placeholder
       // to the shipped table; rejects wrong k1,k2 or grid.)
-      final published = acrylicPublishedPlaceholder.published!;
-      for (final p in acrylicPublishedPlaceholder.table.pigments) {
+      final published = acrylicPublished.published!;
+      for (final p in acrylicPublished.table.pigments) {
         final rendered = spectrumToColour(kmReflectance(_koverS(p)));
         expect(deltaE00(rendered.xyz, published[p.id]!.xyz),
             lessThanOrEqualTo(0.5));

@@ -129,7 +129,7 @@ void main() {
       // Until G-3/DATA-5 the acrylic table is the synthetic placeholder, so the
       // real-source provenance Then below cannot be exercised. DATA-7 augments
       // the acrylic NOTICE wording and flips this precondition.
-      expect(acrylicPublishedPlaceholder.isReal, isTrue,
+      expect(acrylicPublished.isReal, isTrue,
           reason: 'AC-11 asserts the finalized Golden/RIT attribution + '
               'provenance-per-real-source on the real data — G-3/DATA-5/DATA-7');
 

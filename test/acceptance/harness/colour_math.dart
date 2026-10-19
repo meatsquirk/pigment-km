@@ -82,6 +82,51 @@ Oklch srgbToOklch(Srgb c) {
 ColourValue colourFromSrgb(Srgb srgb) =>
     ColourValue(srgb: srgb, xyz: srgbToXyz(srgb), oklch: srgbToOklch(srgb));
 
+/// CIE XYZ (D65 10°, Y normalized to 1) of a CIELAB L*a*b* triple — the exact
+/// inverse of [xyzToLab]. Used to turn a dataset's published L*a*b* into the XYZ
+/// the acceptance tests compare against (AC-7 Golden/RIT round-trip yardstick).
+Xyz labToXyz(double l, double a, double b) {
+  const d = 6.0 / 29.0;
+  double finv(double t) => t > d ? t * t * t : 3 * d * d * (t - 4.0 / 29.0);
+  final fy = (l + 16) / 116;
+  final fx = fy + a / 500;
+  final fz = fy - b / 200;
+  return (
+    x: _d65White.x * finv(fx),
+    y: _d65White.y * finv(fy),
+    z: _d65White.z * finv(fz),
+  );
+}
+
+/// The sRGB opto-electronic transfer function: one linear-light channel to its
+/// gamma-encoded value, clamped to the display gamut (the inverse of
+/// [_srgbToLinear]).
+double _linearToSrgb(double c) {
+  final v = c <= 0.0031308 ? 12.92 * c : 1.055 * math.pow(c, 1 / 2.4) - 0.055;
+  return v.clamp(0.0, 1.0).toDouble();
+}
+
+/// Displayable sRGB of an XYZ value (standard D65 XYZ→linear-sRGB matrix, the
+/// inverse of [srgbToXyz], then the sRGB transfer function, clamped to the
+/// display gamut). For a strongly chromatic (out-of-gamut) colour the clamp
+/// makes sRGB only a display stand-in — the gamut-truthful representation is XYZ.
+Srgb xyzToSrgb(Xyz xyz) {
+  final r = 3.2409699419 * xyz.x - 1.5373831776 * xyz.y - 0.4986107603 * xyz.z;
+  final g = -0.9692436363 * xyz.x + 1.8759675015 * xyz.y + 0.0415550574 * xyz.z;
+  final b = 0.0556300797 * xyz.x - 0.2039769589 * xyz.y + 1.0569715142 * xyz.z;
+  return (r: _linearToSrgb(r), g: _linearToSrgb(g), b: _linearToSrgb(b));
+}
+
+/// Builds a consistent [ColourValue] from a published CIELAB L*a*b* triple: XYZ
+/// is the exact [labToXyz] (the value colour-difference maths use), sRGB/OKLCh
+/// are the display/gamut stand-ins derived from it. Acceptance tests assert on
+/// the XYZ; the other two are carried for parity with the engine's own triples.
+ColourValue colourFromLab(double l, double a, double b) {
+  final xyz = labToXyz(l, a, b);
+  final srgb = xyzToSrgb(xyz);
+  return ColourValue(srgb: srgb, xyz: xyz, oklch: srgbToOklch(srgb));
+}
+
 /// The absolute circular hue difference in degrees (0..180).
 double hueDiffDeg(double a, double b) {
   var d = (a - b).abs() % 360;

@@ -69,9 +69,11 @@ void main() {
       expect(synthPigments(), isNotEmpty);
       expect(synthWhite().id, 'acrylic.titanium_white');
 
-      // Real-data fixtures are explicit placeholders until their gates close.
-      expect(acrylicPublishedPlaceholder.isReal, isFalse);
-      expect(acrylicPublishedPlaceholder.published, isNull);
+      // The acrylic Golden/RIT fixture is real since DATA-5 (its dataset landed,
+      // G-3); the oil fixture is still a placeholder until its gate closes (G-4).
+      expect(acrylicPublished.isReal, isTrue);
+      expect(acrylicPublished.published, isNotNull);
+      expect(acrylicPublished.table.pigments, hasLength(78));
       expect(oilMixturesPlaceholder.isReal, isFalse);
 
       expect(illuminants.isPlaceholder, isTrue);
