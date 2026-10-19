@@ -1,6 +1,6 @@
 # Module PROD — provenance, baseline engine + A/B, interface freeze
 
-**Status:** In progress (PROD-2 ✅; PROD-3 next)
+**Status:** ✅ Done (PROD-2 ✅; PROD-3 ✅) — module complete
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/engine/provenance.dart` (tier derivation), `lib/src/engine/spectral_baseline_engine.dart` (real single-constant impl), `lib/src/ab/ab_harness.dart`
 **Depends on:** SOLVER · **Blocks:** SIGNOFF-1
@@ -10,7 +10,7 @@
 | Phase | Kind | Target AC | Status | Tokens | Time |
 |---|---|---|---|---|---|
 | 2 (PROD-2) | behavior | AC-24 | ✅ Done | 7.07M | 12m 45s |
-| 3 (PROD-3) | behavior | AC-25 | ⬜ Todo | | |
+| 3 (PROD-3) | behavior | AC-25 | ✅ Done | 11.30M | 18m 43s |
 
 ## Interface reconciliation
 
@@ -53,4 +53,20 @@ Design §8 S5: recipes from measured data → `Calculated`; a user-measured tube
 - **Exit criteria:** analyze clean; 100% touched; both engines interchangeable via the interface; harness reports ΔE00 per engine.
 - **Acceptance gate:** un-pend AC-25; `TestAC25_ABEngines` green.
 
-### Result · Checkpoint  <!-- filled on completion -->
+### Result · Checkpoint
+
+**PROD-3 ✅ (2026-10-19): AC-25 A/B interchangeable engines un-pended, green. The `MixingEngine` interface is now frozen.** The single-constant spectral baseline engine is complete and the A/B harness ships, so both engines drive through the identical `MixingEngine.inverse(target, palette, opts)` call with no caller change (AC-25, SI D3). 20 A re-grade (AC-25 A + 19 carried re-confirmed), 0 downgrades, 0 fixes.
+
+- **What landed.** `lib/src/engine/spectral_baseline_engine.dart` filled in from its shell: a genuine **single-constant** model — each paint is reduced to its per-λ absorption/scattering ratio `K/S` and those ratios are mixed linearly (`(K/S)mix = Σ v·K/S`), vs the two-constant engine's separate `Kmix`/`Smix`. From the mixed `K/S` the pipeline is shared with `CustomKmEngine`: `kmReflectance` → `saundersonToMeasured` → `spectrumToColour`. Its `inverse` is a self-contained palette-constrained subset search (per-medium partition, coarse 1/12 simplex grid + successive refinement, best-first-by-ΔE00 / fewer-paints-on-tie ranking, honest target-level out-of-gamut flag, topK truncation), reusing the exported `deltaE2000Xyz` metric and engine-internal `recipeProvenance`. New `lib/src/ab/ab_harness.dart` — `ABHarness`/`ABReport`: drives any labelled set of engines through the one interface on a shared swatch set and reports each engine's best-recipe ΔE00 per swatch plus the mean (the headline A/B number). Barrel exports `ab/ab_harness.dart`.
+- **File-list reconciliation:** the plan listed `spectral_baseline_engine.dart, ab/ab_harness.dart`. Also touched: `lib/pigment_km.dart` (+1 export line for the harness) and `test/engine_test.dart` (the old "stubs throw UnimplementedError" baseline test is now wrong — replaced with the real baseline test group; the now-unused `_behavesAsUnimplementedStub` helper removed).
+- **Interface decisions:** the baseline is a *reference* model, not the product engine, so it deliberately omits the TUNE chroma penalty (a product lever) and predicts in the paint's native **wet** state only (the wet/dry toggle is a product display lever). Both are documented on the class. The baseline's `inverse` is not bound by SOLVER-7's subset budget (it is an eval tool, not on the hot product path); on the shipped 3-paint palettes this is moot.
+- **Verification** (BASE `8eb47a5`; `export PATH="$HOME/development/flutter/bin:$PATH"` first). `dart analyze` → clean on touched files (one pre-existing `info` in `test/chroma_penalty_test.dart`, untouched). `dart test` → **207 passed / 7 skipped**. `dart test test/acceptance -x stretch` → **29 passed / 5 skipped** (AC-25 live & green; the 5 skips are the genuinely-pending AC-11/12/21 + the two @stretch S6). Coverage gate (`tool/coverage_gate.sh 8eb47a5`) → **PASS**: `spectral_baseline_engine.dart` 117/117, `ab/ab_harness.dart` 24/24, `pigment_km.dart` no executable lines. New unit tests: a 10-test `SpectralBaselineEngine` group in `test/engine_test.dart` (single-constant-vs-two-constant divergence control, ranking, cross-medium partition, OOG, tie-break, refinement bounds, resolver branches) + 4 tests in `test/ab_harness_test.dart` (per-swatch report + mean, empty-palette→∞, unknown-label throw, zero-swatch mean throw).
+- **Augmentations:** none. AC-25's test was frozen grade-A at the test review with no scheduled augmentation (it is not in the ITEST *Test augmentations* table), so it was un-pended unchanged (delete its `pendingACs` row; add the `unpendedACs` row). Pending-gate bijection kept exact (20 un-pended / 7 pending).
+- **Grade gate:** fresh independent adversarial grader (G1–G6, given the PROD-2 grid) → **20 A, 0 B, 0 downgrades, 0 fixes**. AC-25 A: mutation-confirmed it rejects a baseline that throws (not wired), returns empty (`.first`), or returns negative/NaN ΔE00 (`isNonNegative`/`isFinite`). The grader noted — and accepted — that AC-25 deliberately does **not** assert the two engines' distances *differ* (an identical baseline would pass): the AC requires interchangeability + per-swatch reporting, not divergence, so this is not a G5 gap. No carried AC regressed: the diff is additive (two new/filled lib files + one export); `CustomKmEngine`, `inverse.dart`, `forward.dart`, the types — the surface every other AC drives — are byte-identical to BASE.
+- **Fix passes:** 0/3 (first full run green across analyze, unit+coverage, acceptance, grade).
+
+**Checkpoint / Handoff.**
+- **Frozen interface:** `MixingEngine` (`forward`/`reflectanceOf`/`inverse`) is now implemented by **both** `CustomKmEngine` (two-constant, product) and `SpectralBaselineEngine` (single-constant, reference) and is frozen. `ABHarness({engines, palette, opts}).run(swatches) → ABReport` with `deltaE00For(label)` / `meanDeltaE00For(label)` / `engines` / `swatchCount` (both barrel-exported).
+- **Known gaps:** none for AC-25. The baseline's match *accuracy* on real data is out of scope (it is the deliberately-simpler reference arm); the A/B *fidelity* comparison on real pigments rides on the dataset gates (G-3/G-4), not on this phase.
+- **Module PROD is complete** (PROD-2 ✅, PROD-3 ✅). PROD-3 closes one of SIGNOFF-1's four dependencies; the remaining three (DATA-7/G-3, STRETCH-3/G-7 — and TUNE-4 already done) gate sign-off.
+- **Verification commands (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"` first. `dart analyze`; `dart test`; coverage `bash tool/coverage_gate.sh <BASE>`; acceptance default `dart test test/acceptance -x stretch`; run-pending `PIGMENT_KM_RUN_PENDING=true dart test test/acceptance -x stretch`.

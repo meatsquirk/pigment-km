@@ -26,15 +26,6 @@ const _target = ColourValue(
   oklch: (l: 0.7, c: 0.1, h: 120.0),
 );
 
-void _behavesAsUnimplementedStub(MixingEngine engine) {
-  expect(() => engine.forward(const {'a': 1.0}), throwsUnimplementedError);
-  expect(
-    () => engine.inverse(_target, const [], const MixOptions()),
-    throwsUnimplementedError,
-  );
-  expect(() => engine.reflectanceOf(const {'a': 1.0}), throwsUnimplementedError);
-}
-
 void main() {
   test('CustomKmEngine implements MixingEngine; forward and inverse are live '
       '(FORWARD-2, SOLVER-2)', () {
@@ -596,9 +587,212 @@ void main() {
     });
   });
 
-  test('SpectralBaselineEngine implements MixingEngine and stubs throw', () {
+  group('SpectralBaselineEngine — single-constant baseline (PROD-3, AC-25)', () {
     const engine = SpectralBaselineEngine();
-    expect(engine, isA<MixingEngine>());
-    _behavesAsUnimplementedStub(engine);
+    const whiteId = 'acrylic.titanium_white';
+    const blueId = 'acrylic.phthalo_blue';
+    const redId = 'acrylic.naphthol_red';
+    final acrylic = PigmentTable.load(Medium.acrylic).pigments;
+    final oil = PigmentTable.load(Medium.oil).pigments;
+
+    test('implements MixingEngine; forward is spectrumToColour(reflectanceOf); '
+        'an empty palette has no recipes', () {
+      expect(engine, isA<MixingEngine>());
+      final reflectance = engine.reflectanceOf(const {whiteId: 1.0});
+      expect(reflectance, hasLength(CanonicalGrid.bins));
+      // forward shares the one pipeline: it is exactly the colour of the
+      // predicted reflectance.
+      expect(engine.forward(const {whiteId: 1.0}),
+          spectrumToColour(engine.reflectanceOf(const {whiteId: 1.0})));
+      // The empty-palette guard returns no recipes (not an error).
+      expect(engine.inverse(_target, const [], const MixOptions()), isEmpty);
+    });
+
+    test('is genuinely single-constant: a pure paint matches the two-constant '
+        'engine, but a differently-scattering MIX diverges', () {
+      const measured = CustomKmEngine();
+      // A single paint has one component, so (K/S)mix == Kmix/Smix either way —
+      // the two models agree exactly on a pure paint (a control that rejects a
+      // baseline that is secretly a no-op / constant output).
+      expect(engine.reflectanceOf(const {whiteId: 1.0}),
+          measured.reflectanceOf(const {whiteId: 1.0}));
+      // A mix of paints whose scattering differs (opaque white vs a chromatic
+      // paint) is where mixing K/S ratios (single-constant) and mixing K and S
+      // separately (two-constant) part ways. Rejects a baseline that just copies
+      // the two-constant engine.
+      const mix = {whiteId: 0.6, blueId: 0.4};
+      final base = engine.reflectanceOf(mix);
+      final two = measured.reflectanceOf(mix);
+      expect(spectraEqual(base, two), isFalse,
+          reason: 'the single-constant mix must differ from the two-constant '
+              'mix when scattering differs across paints');
+    });
+
+    test('inverse returns palette-only recipes, parts summing to 1, ranked '
+        'best-first, capped at topK', () {
+      final target = engine.forward(const {whiteId: 0.7, blueId: 0.3});
+      const opts = MixOptions(topK: 4);
+      final recipes = engine.inverse(target, acrylic, opts);
+      expect(recipes, isNotEmpty);
+      expect(recipes.length, lessThanOrEqualTo(opts.topK));
+      final paletteIds = acrylic.map((p) => p.id).toSet();
+      for (final r in recipes) {
+        expect(r.parts, isNotEmpty);
+        expect(r.parts.keys, everyElement(isIn(paletteIds)));
+        expect(r.parts.values, everyElement(greaterThan(0.0)));
+        expect(r.parts.values.fold<double>(0, (a, b) => a + b),
+            closeTo(1.0, 1e-9));
+        expect(r.medium, Medium.acrylic);
+        expect(r.outOfGamut, isFalse);
+        expect(r.verdict, contains('ΔE00'));
+        expect(r.provenance, Provenance.estimated); // synthetic palette
+      }
+      for (var i = 1; i < recipes.length; i++) {
+        expect(recipes[i].deltaE00,
+            greaterThanOrEqualTo(recipes[i - 1].deltaE00));
+      }
+      // A target the baseline itself can mix is matched closely (refinement).
+      expect(recipes.first.deltaE00, lessThan(1.0));
+    });
+
+    test('maxPaints caps the subset size (the <= topK, no-truncation arm)', () {
+      final target = engine.forward(const {whiteId: 0.7, blueId: 0.3});
+      // maxPaints 1 → one single-paint recipe per palette paint (3 ≤ default
+      // topK 5, so the ranked list is returned whole, not sublisted).
+      final recipes =
+          engine.inverse(target, acrylic, const MixOptions(maxPaints: 1));
+      expect(recipes, hasLength(acrylic.length));
+      expect(recipes, everyElement(predicate<Recipe>((r) => r.parts.length == 1)));
+    });
+
+    test('a mixed-media palette never produces a recipe spanning media, and the '
+        'non-first medium is genuinely searched', () {
+      final mixedPalette = <Pigment>[...acrylic, ...oil];
+      final idToMedium = <String, Medium>{
+        for (final p in mixedPalette) p.id: p.medium,
+      };
+      // Target a pure OIL paint's colour (oil is the second group): only
+      // searching the oil group can reach it. Rejects a solver that searches
+      // only the first medium.
+      final target = engine.forward(const {'oil.yellow_ochre': 1.0});
+      final recipes = engine.inverse(target, mixedPalette, const MixOptions());
+      expect(recipes, isNotEmpty);
+      for (final r in recipes) {
+        final media = r.parts.keys.map((id) => idToMedium[id]).toSet();
+        expect(media, hasLength(1), reason: '${r.parts.keys} spans $media');
+        expect(media.single, r.medium);
+      }
+      expect(recipes.first.medium, Medium.oil);
+      expect(recipes.first.deltaE00, lessThan(1.0));
+    });
+
+    test('an unreachable target: every recipe is flagged out-of-gamut and never '
+        'claimed a match', () {
+      // The acrylic palette (white, blue, red) has no green primary, so a vivid
+      // pure green is unreachable by any single-constant mixture of it.
+      const green = ColourValue(
+        srgb: (r: 0.0, g: 1.0, b: 0.0),
+        xyz: (x: 0.3576, y: 0.7152, z: 0.1192),
+        oklch: (l: 0.866, c: 0.295, h: 142.5),
+      );
+      final recipes = engine.inverse(green, acrylic, const MixOptions());
+      expect(recipes, isNotEmpty);
+      const ceiling = 5.0;
+      for (final r in recipes) {
+        expect(r.outOfGamut, isTrue);
+        expect(r.deltaE00, greaterThan(ceiling));
+        expect(r.verdict, contains('out of gamut'));
+        expect(r.verdict, contains(r.deltaE00.toStringAsFixed(2)));
+      }
+    });
+
+    group('ranking tie-break (prefer fewer paints on an exact ΔE00 tie)', () {
+      // Six identical-reflectance paints (same K, same S, distinct ids): every
+      // single-constant mixture predicts the same colour at any ratio, so all
+      // subsets tie EXACTLY on ΔE00 — exercising the byDelta == 0 branch and
+      // proving the fewer-paint secondary key, not sort order, decides the rank.
+      final k = Float32List.fromList(
+          [for (var i = 0; i < CanonicalGrid.bins; i++) 0.07 + 0.015 * i]);
+      final s =
+          Float32List.fromList(List<double>.filled(CanonicalGrid.bins, 0.4));
+      Pigment twin(String id) => Pigment(
+            id: id,
+            name: id,
+            pigmentIndex: 'PX',
+            medium: Medium.acrylic,
+            k: k,
+            s: s,
+            opacity: 0.5,
+            provenance: Provenance.estimated,
+            sourceRef: 'synthetic:$id',
+          );
+      final twins = [for (final id in ['a', 'b', 'c', 'd', 'e', 'f']) twin(id)];
+      const target = ColourValue(
+        srgb: (r: 0.5, g: 0.5, b: 0.5),
+        xyz: (x: 0.2, y: 0.2, z: 0.2),
+        oklch: (l: 0.5, c: 0.0, h: 0.0),
+      );
+
+      test('on an exact ΔE00 tie the fewer-paint recipe ranks first', () {
+        final recipes =
+            engine.inverse(target, twins, const MixOptions(topK: 100));
+        expect(recipes, hasLength(56)); // C(6, 1..4)
+        final tied = recipes.first.deltaE00;
+        expect(recipes,
+            everyElement(predicate<Recipe>((r) => r.deltaE00 == tied)));
+        final counts = [for (final r in recipes) r.parts.length];
+        expect(counts.first, 1);
+        expect(counts.last, 4);
+        for (var i = 1; i < counts.length; i++) {
+          expect(counts[i], greaterThanOrEqualTo(counts[i - 1]));
+        }
+      });
+
+      test('truncation to topK keeps the tie-break winners (the sublist arm)', () {
+        final recipes = engine.inverse(target, twins, const MixOptions(topK: 6));
+        expect(recipes, hasLength(6));
+        expect(recipes,
+            everyElement(predicate<Recipe>((r) => r.parts.length == 1)),
+            reason: 'the simplest recipes outrank equal-ΔE00 heavier ones');
+      });
+    });
+
+    test('refinement drives a near-pure reachable tint tight, respecting the '
+        'strictly-positive simplex bounds', () {
+      // An exact baseline mixture at an off-grid, near-boundary ratio: the
+      // optimal blue share (0.001) is below the finest refinement step, so the
+      // hill-climb drives one share toward 0 and the other toward 1 and must
+      // reject moves crossing either bound (the trial[j] <= 0 / trial[i] >= 1
+      // guard, both sides).
+      final target = engine.forward(const {whiteId: 0.999, blueId: 0.001});
+      final best = engine.inverse(target, acrylic, const MixOptions()).first;
+      expect(best.deltaE00, lessThanOrEqualTo(5.0));
+      expect(best.parts.values, everyElement(greaterThan(0.0)));
+      expect(best.parts.values, everyElement(lessThan(1.0)));
+    });
+
+    test('a three-paint off-grid target is refined over the 2-D simplex', () {
+      final target =
+          engine.forward(const {whiteId: 0.62, blueId: 0.23, redId: 0.15});
+      final recipes = engine.inverse(target, acrylic, const MixOptions());
+      final threePaint = recipes.firstWhere((r) => r.parts.length == 3,
+          orElse: () => recipes.first);
+      expect(threePaint.parts, hasLength(3));
+      expect(threePaint.deltaE00, lessThan(1.0),
+          reason: 'refinement reaches a reachable 3-paint mix closely');
+    });
+
+    test('forward resolves an oil-medium id (second medium table), and rejects '
+        'an unknown id and a cross-medium mix', () {
+      // The resolver loop must continue past the acrylic table to oil.
+      expect(engine.forward(const {'oil.lead_white': 1.0}), isA<ColourValue>());
+      expect(() => engine.forward(const {'acrylic.not_a_paint': 1.0}),
+          throwsArgumentError);
+      // A single mixture spanning media is rejected by the bound reducer.
+      expect(
+        () => engine.reflectanceOf(const {whiteId: 0.5, 'oil.lead_white': 0.5}),
+        throwsArgumentError,
+      );
+    });
   });
 }

@@ -28,6 +28,7 @@ const Map<String, String> unpendedACs = <String, String>{
   'AC-22': 'TUNE-2',
   'AC-23': 'TUNE-4',
   'AC-24': 'PROD-2',
+  'AC-25': 'PROD-3',
 };
 
 /// Guards the pending gate itself (never pending). The assertions pin the full

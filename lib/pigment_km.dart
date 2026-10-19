@@ -9,6 +9,7 @@
 /// `UnimplementedError` stubs until their COLOR/KM/DATA phase lands).
 library;
 
+export 'src/ab/ab_harness.dart';
 export 'src/colour/gamut_map.dart';
 export 'src/colour/spectrum_to_colour.dart';
 export 'src/data/artifact_format.dart';
