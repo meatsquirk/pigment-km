@@ -24,8 +24,13 @@ void main() {
       expect(acrylic.medium, Medium.acrylic);
       expect(acrylic.k1, closeTo(0.04, 1e-12));
       expect(acrylic.k2, closeTo(0.6, 1e-12));
-      // The drying transform defaults to the identity until TUNE sets it.
-      expect(acrylic.wetDry, WetDryTransform.none);
+      // TUNE-4 (AC-23): acrylic carries a documented wet→dry drying offset —
+      // dry is darker (negative L*), slightly more chromatic and hue-shifted.
+      expect(acrylic.wetDry, isNot(WetDryTransform.none));
+      expect(acrylic.wetDry.lightnessDelta, lessThan(0),
+          reason: 'acrylic dries darker');
+      expect(acrylic.wetDry.hueDeltaDeg, isNot(0),
+          reason: 'acrylic dries with a hue shift');
     });
 
     test('oil carries its own distinct defaults', () {
@@ -33,6 +38,9 @@ void main() {
       expect(oil.medium, Medium.oil);
       expect(oil.k1, closeTo(0.05, 1e-12));
       expect(oil.k2, closeTo(0.6, 1e-12));
+      // Oil's authoritative drying offset rides on the pending MPI oil dataset
+      // (G-4/G-5): until it lands the oil toggle is honestly the identity.
+      expect(oil.wetDry, WetDryTransform.none);
     });
 
     test('acrylic and oil do not share both constants', () {

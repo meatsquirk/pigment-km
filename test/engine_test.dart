@@ -483,6 +483,51 @@ void main() {
     });
   });
 
+  group('CustomKmEngine.inverse — wet/dry state toggle (TUNE-4)', () {
+    const engine = CustomKmEngine();
+    final palette = PigmentTable.load(Medium.acrylic).pigments;
+    final target = engine.forward(const {
+      'acrylic.titanium_white': 0.6,
+      'acrylic.phthalo_blue': 0.4,
+    });
+
+    test('the dry solve keeps the wet recipe but re-renders it darker', () {
+      // The toggle rides on MixOptions.wet, read through inverse (gate G-2 —
+      // forward()/the solve stay option-free). The dry state is a post-prediction
+      // re-render: same recipes, same ΔE00, only the colour moves.
+      final wet = engine.inverse(target, palette, const MixOptions(wet: true));
+      final dry = engine.inverse(target, palette, const MixOptions(wet: false));
+      expect(wet, isNotEmpty);
+      expect(dry, hasLength(wet.length));
+
+      final offset = configForMedium(Medium.acrylic).wetDry;
+      expect(offset, isNot(WetDryTransform.none),
+          reason: 'acrylic documents a non-identity drying offset');
+
+      for (var i = 0; i < wet.length; i++) {
+        expect(dry[i].parts, wet[i].parts,
+            reason: 'wet→dry never re-solves, so the parts are unchanged');
+        expect(dry[i].deltaE00, wet[i].deltaE00);
+        expect(dry[i].provenance, wet[i].provenance);
+        expect(dry[i].outOfGamut, wet[i].outOfGamut);
+        expect(dry[i].verdict, wet[i].verdict);
+        // Only the predicted colour moves — and acrylic dries darker.
+        expect(dry[i].colour, isNot(wet[i].colour));
+        expect(dry[i].colour.xyz.y, lessThan(wet[i].colour.xyz.y),
+            reason: "acrylic's dry colour is darker (lower Y)");
+      }
+    });
+
+    test('wet is the default state (the if-wet return arm)', () {
+      final byDefault = engine.inverse(target, palette, const MixOptions());
+      final explicitWet =
+          engine.inverse(target, palette, const MixOptions(wet: true));
+      expect(byDefault.first.colour, explicitWet.first.colour,
+          reason: 'MixOptions defaults to the wet state, so colours are '
+              'identical to an explicit wet solve');
+    });
+  });
+
   group('deltaE2000 colour difference (solver metric)', () {
     test('identical colours are ΔE00 0; XYZ wrapper agrees with Lab', () {
       expect(deltaE2000Lab(50, 10, -20, 50, 10, -20), closeTo(0, 1e-12));

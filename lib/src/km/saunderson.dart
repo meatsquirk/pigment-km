@@ -20,19 +20,46 @@ const double _acrylicK2 = 0.6;
 const double _oilK1 = 0.05;
 const double _oilK2 = 0.6;
 
+/// The documented acrylic wet→dry drying offset (design §7 lever 3, D-12), in
+/// CIE L*C*h: as an acrylic film's milky binder clarifies on drying the colour
+/// **darkens** ([WetDryTransform.lightnessDelta] negative), gains a little
+/// chroma as the clarified binder deepens it, and shifts slightly in hue. Like
+/// the Saunderson `k1,k2` above these are **documented defaults**; the
+/// authoritative per-medium drying shift is confirmed from the dataset (G-5),
+/// and the AC-23 test asserts the offset's *direction* (dry darker, hue-shifted,
+/// a measurable ΔE00), not these literals.
+const WetDryTransform _acrylicWetDry =
+    WetDryTransform(lightnessDelta: -3.0, chromaDelta: 1.5, hueDeltaDeg: 3.0);
+
+/// The oil wet→dry drying offset. Oil films shift on curing too, but the
+/// authoritative oil drying data rides on the still-pending MPI oil dataset
+/// (G-4/G-5), so until it lands the oil toggle is the identity — honestly no
+/// shift rather than a guessed one (the k1,k2 gated-defaults pattern above).
+const WetDryTransform _oilWetDry = WetDryTransform.none;
+
 /// The per-medium Saunderson surface-correction constants (design §3.2, §4.3).
 ///
 /// Returns the [MediumConfig] — the `k1`, `k2` surface-reflection constants and
-/// the drying transform — for [medium]. Acrylic and oil carry **distinct**
-/// constants (oil's refractive-index boundary differs from acrylic's), so the
-/// same internal reflectance corrects to different measured reflectance per
-/// medium (AC-4 control). The authoritative values come from each dataset's
-/// README (G-5); until then this uses the documented defaults above.
+/// the wet→dry drying transform — for [medium]. Acrylic and oil carry
+/// **distinct** constants (oil's refractive-index boundary differs from
+/// acrylic's), so the same internal reflectance corrects to different measured
+/// reflectance per medium (AC-4 control). Acrylic also carries a documented
+/// drying offset ([_acrylicWetDry]); oil's is gated on its dataset. The
+/// authoritative values come from each dataset's README (G-5); until then this
+/// uses the documented defaults above.
 MediumConfig configForMedium(Medium medium) => switch (medium) {
-      Medium.acrylic =>
-        const MediumConfig(medium: Medium.acrylic, k1: _acrylicK1, k2: _acrylicK2),
-      Medium.oil =>
-        const MediumConfig(medium: Medium.oil, k1: _oilK1, k2: _oilK2),
+      Medium.acrylic => const MediumConfig(
+          medium: Medium.acrylic,
+          k1: _acrylicK1,
+          k2: _acrylicK2,
+          wetDry: _acrylicWetDry,
+        ),
+      Medium.oil => const MediumConfig(
+          medium: Medium.oil,
+          k1: _oilK1,
+          k2: _oilK2,
+          wetDry: _oilWetDry,
+        ),
     };
 
 /// Applies the Saunderson correction, mapping an [internal] reflectance spectrum

@@ -1,5 +1,7 @@
 import '../data/pigment_table.dart';
 import '../grid.dart';
+import '../km/saunderson.dart';
+import '../tune/wet_dry.dart';
 import '../types/colour_value.dart';
 import '../types/medium.dart';
 import '../types/mix_options.dart';
@@ -32,8 +34,23 @@ class CustomKmEngine implements MixingEngine {
     ColourValue target,
     List<Pigment> palette,
     MixOptions opts,
-  ) =>
-      solvePaletteConstrained(target, palette, opts);
+  ) {
+    // The solve always works in the paint's wet state (the model's native
+    // prediction), so the recipes, their ranking and their ΔE00 match distances
+    // are identical for wet and dry (TUNE-4 / AC-23, gate G-2 — the wet/dry
+    // choice is a display state, not a solver parameter). When the dry state is
+    // requested each recipe is re-rendered through the medium's documented
+    // drying offset ([configForMedium] → [WetDryTransform]) without re-solving:
+    // only the predicted colour moves, the parts stay put.
+    final recipes = solvePaletteConstrained(target, palette, opts);
+    if (opts.wet) {
+      return recipes;
+    }
+    return <Recipe>[
+      for (final recipe in recipes)
+        toDryState(recipe, configForMedium(recipe.medium).wetDry),
+    ];
+  }
 
   /// Resolves a paint [id] to its [Pigment] by searching the loaded pigment
   /// table of each medium (design §4). Throws [ArgumentError] if no medium's

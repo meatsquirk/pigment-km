@@ -1,6 +1,6 @@
 # Module TUNE — natural, muted colour
 
-**Status:** In progress — TUNE-2 ✅ (AC-22 chroma penalty). Next: TUNE-4 (AC-23 wet/dry); TUNE-3 (AC-21) gated on G-3.
+**Status:** In progress — TUNE-2 ✅ (AC-22 chroma penalty), TUNE-4 ✅ (AC-23 wet/dry). Only TUNE-3 (AC-21) left, gated on G-3 (real palette).
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/tune/default_palettes.dart` (curated naturalistic per-medium palettes), `lib/src/tune/chroma_penalty.dart`, `lib/src/tune/wet_dry.dart`
 **Depends on:** SOLVER, DATA · **Blocks:** SIGNOFF-1
@@ -11,7 +11,7 @@
 |---|---|---|---|---|---|
 | 2 (TUNE-2) | behavior | AC-22 | ✅ Done | 14.91M | 30m 48s |
 | 3 (TUNE-3) | behavior | AC-21 | ⬜ Todo (G-3 real palette) | | |
-| 4 (TUNE-4) | behavior | AC-23 | ⬜ Todo | | |
+| 4 (TUNE-4) | behavior | AC-23 | ✅ Done | 8.87M | 16m 55s |
 
 ## Interface reconciliation
 
@@ -114,4 +114,65 @@ visible match accuracy.
 - **Exit criteria:** analyze clean; 100% touched; dry≠wet by the documented offset; parts unchanged.
 - **Acceptance gate:** un-pend AC-23; `TestAC23_WetDry` green.
 
-### Result · Checkpoint  <!-- filled on completion -->
+### Result · Checkpoint
+
+**Result (TUNE-4 · AC-23).** The wet/dry toggle is a post-prediction display
+state, not a solver parameter — the solve always works in the paint's wet
+(native-prediction) state, and the dry state re-renders each recipe's colour by
+the medium's documented drying offset without re-solving.
+- **New module `lib/src/tune/wet_dry.dart`** — `toDryState(Recipe, WetDryTransform)`
+  carries parts/ΔE00/provenance/outOfGamut/verdict through unchanged and re-renders
+  only `colour` via `driedColour(ColourValue, WetDryTransform)`: XYZ → CIELAB →
+  L*C*h, add the transform's `lightnessDelta`/`chromaDelta` (clamped ≥ 0)/
+  `hueDeltaDeg` (wrapped to `[0,360)`), back to CIELAB → XYZ, then rebuild a
+  consistent sRGB/XYZ/OKLCh triple with the colour backend's own matrices
+  (`oklch.dart`, no duplicated constants). The identity transform short-circuits
+  (returns the input unchanged). Because L* alone sets Y, a negative lightness
+  delta darkens (lowers Y) regardless of the chroma/hue deltas.
+- **`saunderson.dart`** — acrylic's `MediumConfig` now carries a documented
+  non-identity `WetDryTransform(lightnessDelta: -3, chromaDelta: 1.5, hueDeltaDeg: 3)`
+  (dry is darker, slightly deeper, hue-shifted); oil stays `WetDryTransform.none`,
+  honestly deferred until the MPI oil drying data (G-4/G-5). Documented-defaults
+  pattern (like `k1,k2`): the AC asserts the offset's *direction*, not the literals.
+- **`custom_km_engine.dart`** — `CustomKmEngine.inverse` reads `opts.wet`: when
+  true it returns `solvePaletteConstrained` unchanged (the option-free solve, gate
+  G-2); when false it maps each recipe through `toDryState(r, configForMedium(r.medium).wetDry)`.
+  `forward`/the solve stay option-free; the wet/dry choice is read through `inverse`.
+- **Acceptance.** AC-23 un-pended (row deleted from `pending.dart`; added to
+  `unpendedACs` → TUNE-4 in `pending_gate_test.dart`). `TestAC23_WetDry` green in
+  the default run. No augmentation was scheduled for AC-23, and the behaviour
+  enables none for other ACs (the transform fires only on the non-default dry
+  path, which no other AC test exercises).
+- **Verification.** `dart analyze` → clean (exit 0; the one pre-existing `info`
+  is TUNE-2's test file, untouched). `dart test` → **185 passed / 9 skipped**;
+  `dart test test/acceptance` → **27 passed / 9 skipped** (the 9 still-pending
+  ACs). Coverage gate (vs BASE `da7cdb4`) → **PASS**: `wet_dry.dart` 47/47,
+  `saunderson.dart` 19/19, `custom_km_engine.dart` 15/15 (line metric, CORE
+  deviation). No exclusive lane (pure in-process colour maths).
+- **Grade gate.** Fresh independent adversarial grader (G1–G6), given the TUNE-2
+  grid → **18 A, 0 B, 0 downgrades**. AC-23 A; AC-1..6,8,10,13..22 re-confirmed
+  (the dry transform is inert on every default-`MixOptions()` path, so carried
+  colours are byte-identical to BASE). Grid: *Behaviour re-grade — TUNE-4*.
+- **Fix passes:** 0/3 (first full run green across analyze, unit+coverage,
+  acceptance and grade; the only follow-up was registering AC-23 in `unpendedACs`
+  so the pending-gate bijection stayed exact — not a gate failure). **Tokens /
+  time:** see dashboard.
+
+**Checkpoint / Handoff.**
+- **Frozen interface:** `lib/src/tune/wet_dry.dart` — `toDryState(Recipe, WetDryTransform)`
+  and `driedColour(ColourValue, WetDryTransform)`; imported by `custom_km_engine.dart`
+  only, **not** barrel-exported (a solver-internal display helper, like
+  `chroma_penalty.dart`). The engine surface (`CustomKmEngine.inverse`,
+  `MixOptions.wet` default `true`) is unchanged; `configForMedium(medium).wetDry`
+  is the public per-medium offset the AC reads.
+- **Verification commands (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"`
+  first. `dart analyze`; `dart test`; coverage `bash tool/coverage_gate.sh <BASE>`;
+  acceptance default `dart test test/acceptance`.
+- **Gotchas for later phases:** (1) a solve returns **wet** colours by default
+  (`MixOptions.wet` defaults true); only `MixOptions(wet: false)` re-renders, and
+  only `CustomKmEngine` applies it — the baseline engine (PROD-3/AC-25) carries no
+  drying offset. (2) The acrylic offset literals (`-3/1.5/3`) are documented
+  defaults pending G-5; TUNE-3's real curated palette (G-3) does not change them.
+  (3) oil's drying offset is still `WetDryTransform.none` — DATA-6/G-4/G-5 may set
+  it when the MPI oil data lands. TUNE-3 (AC-21) remains gated on G-3; the TUNE
+  module's only remaining phase is TUNE-3.

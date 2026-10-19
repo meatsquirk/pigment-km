@@ -1,7 +1,7 @@
 # Master Plan — pigment_km: measured-pigment Kubelka–Munk mixing engine
 
 **Spec:** [pigment-km-engine.feature](../pigment-km-engine.feature)
-**Status:** In progress — TUNE-2 ✅ 2026-10-18 (AC-22 chroma-penalty tie-break un-pended, green; λ=1e-6 regularizer off in raw ranking; out-of-gamut now reads the true ΔE00 min; 17 A re-grade, 0 downgrades; cov inverse 148/148, chroma_penalty 2/2; 17 ACs un-pended / 10 pending). Next startable: TUNE-4/PROD-2/PROD-3.
+**Status:** In progress — TUNE-4 ✅ 2026-10-19 (AC-23 wet/dry un-pended, green; per-medium wet→dry as a post-prediction state transform, acrylic darker+hue-shifted / oil deferred; solve stays option-free (G-2); 18 A re-grade, 0 downgrades; cov 47/47·19/19·15/15; 18 ACs un-pended / 9 pending). Next startable: PROD-2/PROD-3.
 **Architecture:** [Nuance/docs/custom-mixing-engine-design.md](../../../Nuance/docs/custom-mixing-engine-design.md) (physics §3, datasets §4, forward/inverse §6, tuning §7, staged plan §8, licensing §13) · [Nuance/docs/paint-color-app-solution-intent.md](../../../Nuance/docs/paint-color-app-solution-intent.md) (D3/D6/D7/D9, accuracy NFRs) · consumption contract: `Nuance/lib/recipes/engine/mixing_engine.dart` (bs-04)
 **Code home:** `/Users/matthew.quirk/pigment_km` · remote `https://github.com/meatsquirk/pigment-km` (origin, pushed) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
 
@@ -77,7 +77,7 @@ Greenfield — nothing exists yet; every AC is net-new. The gap is the whole lib
 | AC-20 | The solver returns within the performance budget | ITEST-4 `TestAC20_Performance` | SOLVER-7 | ✅ |
 | AC-21 | The curated default palette cannot produce neon mixes | ITEST-4 `TestAC21_NoNeon` | TUNE-3 | ⬜ Todo |
 | AC-22 | The chroma penalty breaks ΔE00 ties toward the more muted recipe | ITEST-4 `TestAC22_ChromaPenalty` | TUNE-2 | ✅ Done |
-| AC-23 | The wet/dry toggle shifts the prediction by the documented offset | ITEST-4 `TestAC23_WetDry` | TUNE-4 | ⬜ Todo |
+| AC-23 | The wet/dry toggle shifts the prediction by the documented offset | ITEST-4 `TestAC23_WetDry` | TUNE-4 | ✅ Done |
 | AC-24 | Recipes from measured data are Calculated, user tubes Measured | ITEST-4 `TestAC24_Provenance` | PROD-2 | ⬜ Todo |
 | AC-25 | The measured-pigment engine and a baseline engine are interchangeable | ITEST-4 `TestAC25_ABEngines` | PROD-3 | ⬜ Todo |
 | AC-26 | A glaze over a ground predicts via the layering equation | ITEST-4 `TestAC26_Glazing` (@stretch) | STRETCH-2 | ⬜ Todo (G-7) |
@@ -165,7 +165,7 @@ Pre-seeded augmentations: AC-7/AC-11/AC-21 strengthened by DATA-5/DATA-7/TUNE-3 
 | DATA | [modules/DATA.md](modules/DATA.md) | Pigment data model, ingest, resample, NNLS/masstone-tint, build artifact, attribution | CORE, COLOR, KM | 🔄 In progress (DATA-1 ✅, DATA-8 ✅) |
 | FORWARD | [modules/FORWARD.md](modules/FORWARD.md) | `forward()` engine over measured pigments | COLOR, KM, DATA | 🔄 In progress (FORWARD-2 ✅) |
 | SOLVER | [modules/SOLVER.md](modules/SOLVER.md) | `inverse()` palette-constrained solver | FORWARD | ✅ Done (SOLVER-2..7) |
-| TUNE | [modules/TUNE.md](modules/TUNE.md) | Natural-colour tuning: curated palette, chromaPenalty, wet/dry | SOLVER, DATA | 🔄 In progress (TUNE-2 ✅) |
+| TUNE | [modules/TUNE.md](modules/TUNE.md) | Natural-colour tuning: curated palette, chromaPenalty, wet/dry | SOLVER, DATA | 🔄 In progress (TUNE-2 ✅, TUNE-4 ✅; TUNE-3 ↔ G-3) |
 | PROD | [modules/PROD.md](modules/PROD.md) | Provenance wiring, baseline engine + A/B, interface freeze | SOLVER | ⬜ Todo |
 | STRETCH | [modules/STRETCH.md](modules/STRETCH.md) | Finite-layer glazing, metamerism (optional, G-7) | FORWARD, COLOR | ⬜ Todo |
 | ITEST | [modules/ITEST.md](modules/ITEST.md) | Acceptance integration suite: one pending test per AC, and its review | CORE, DATA shells | ✅ Done (ITEST-1..5; G-2 approved 2026-10-16) |
@@ -249,8 +249,8 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 | 29 | SOLVER-7 | AC-20 performance | ✅ Done | 11.78M | 24m 11s | AC-20 un-pended & green; adaptive `maxPaints` cap (subset-count budget) + bit-identical per-subset precompute (`BoundForward`); maxPaints 5/6/8 on 15 paints 2.6/8.7/8.7s→~0.31s; exclusive-lane AC-20 green; test augmented (maxPaints=8 rejects uncapped exponential); cov forward 65/65·inverse 146/146; 16 A re-grade; fix 0/3; SOLVER module ✅ |
 | 30 | TUNE-2 | AC-22 chromaPenalty | ✅ Done | 14.91M | 30m 48s | AC-22 un-pended & green; λ=1e-6 chroma-penalty tie-break (`chroma_penalty.dart`) off in raw ranking; out-of-gamut reads true ΔE00 min; constructed 3-paint-muted vs 2-paint-vivid tie discriminates from AC-15 fewer-paints; 17 A re-grade; fix 1/3 |
 | 31 | TUNE-3 | AC-21 curated palette | ⬜ Todo | | | real palette ↔ G-3 |
-| 32 | TUNE-4 | AC-23 wet/dry | ⬜ Next | | | |
-| 33 | PROD-2 | AC-24 provenance | ⬜ Todo | | | |
+| 32 | TUNE-4 | AC-23 wet/dry | ✅ Done | 8.87M | 16m 55s | AC-23 un-pended & green; per-medium wet→dry as a post-prediction state transform (`wet_dry.dart`: XYZ→L*C*h + documented offset → consistent triple); acrylic `WetDryTransform(-3,1.5,3)` (dry darker+hue-shifted), oil none (G-4/G-5); `inverse` reads `opts.wet`, solve stays option-free (G-2); parts/ΔE00 unchanged; 18 A re-grade; cov 47/47·19/19·15/15; fix 0/3 |
+| 33 | PROD-2 | AC-24 provenance | ⬜ Next | | | |
 | 34 | PROD-3 | AC-25 A/B engines | ⬜ Todo | | | |
 | 35 | STRETCH-2 | AC-26 glazing | ⬜ Todo | | | G-7 |
 | 36 | STRETCH-3 | AC-27 metamerism | ⬜ Todo | | | G-7 |
@@ -260,11 +260,11 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 
 ## Next phase
 
-**TUNE-2 ✅ (2026-10-18): AC-22 chroma-penalty tie-break un-pended, green.** New `lib/src/tune/chroma_penalty.dart` — `naturalChromaPenalty = 1e-6` (λ) + `chromaPenalizedCost(recipe, λ) = ΔE00 + λ·C*` (C* = `recipe.colour.oklch.c`). `inverse.dart` ranks by this cost (λ = `opts.chromaPenalty ? 1e-6 : 0`) then fewer paints; λ is tiny so it only reorders <1e-6-ΔE00 near-ties (off in the raw ranking) and the out-of-gamut verdict now reads the true ΔE00 **minimum** (penalty-independent), so the penalty can only reorder, never flip gamut. Augmentation closed with the un-pend: base test's hard `sawTie` relaxed to a soft sweep + a new constructed-tie test (2-paint VIVID vs 3-paint MUTED twin groups, bisected equidistant target) where penalty-ON ranks the 3-paint muted recipe first — discriminating the chroma penalty from AC-15's fewer-paints rule. Grade gate: 17 A, 0 downgrades; cov inverse 148/148, chroma_penalty 2/2; fix 1/3. 17 un-pended / 10 pending.
+**TUNE-4 ✅ (2026-10-19): AC-23 wet/dry un-pended, green.** The wet/dry choice is a post-prediction display state, not a solver parameter (G-2). New `lib/src/tune/wet_dry.dart` — `toDryState(Recipe, WetDryTransform)` re-renders only `colour` (parts/ΔE00/provenance/gamut/verdict unchanged) via `driedColour`: XYZ→CIELAB→L*C*h + the offset's deltas (chroma clamped ≥0, hue wrapped), back through the colour backend's own matrices to a consistent sRGB/XYZ/OKLCh triple; identity short-circuits. `saunderson.dart` gives acrylic a documented `WetDryTransform(-3, 1.5, 3)` (dry darker+deeper+hue-shifted), oil `none` (deferred to G-4/G-5). `custom_km_engine.dart`: `inverse` returns the solve unchanged when `opts.wet`, else maps each recipe through `toDryState(r, configForMedium(r.medium).wetDry)` — `forward`/the solve stay option-free. Grade gate: 18 A, 0 downgrades; cov wet_dry 47/47·saunderson 19/19·engine 15/15; fix 0/3. 18 un-pended / 9 pending.
 
 **Next, startable now (no gate):**
-- **TUNE-4** (AC-23 wet/dry) ⬜ Next — per-medium wet→dry offset as a post-prediction state transform (G-2: `forward`/`inverse` stay option-free; the `MixOptions.wet` toggle is read through `inverse`). Touches `lib/src/tune/wet_dry.dart` + `custom_km_engine.dart`.
-- Also startable: **PROD-2** (AC-24 provenance), **PROD-3** (AC-25 A/B engines). PROD-3 touches `lib/src/engine/*` (merge-risky with any engine phase); TUNE-4 (`tune/`) and PROD-2 are more disjoint — confirm file ownership per module plans before parallel runs.
+- **PROD-2** (AC-24 provenance) ⬜ Next — the provenance tiering (Calculated from shipped measured data, Measured from a user's own tube). PROD scope (`lib/src/engine/*`, provenance labelling).
+- Also startable: **PROD-3** (AC-25 A/B engines). PROD-3 touches `lib/src/engine/*` (merge-risky with PROD-2 and any engine phase) — confirm file ownership per module plans before parallel runs.
 - **Gate-blocked:** DATA-5 (AC-7)/DATA-7 (AC-11)/TUNE-3 (AC-21) on G-3; DATA-6 (AC-9) on G-4; FORWARD-3 (AC-12) on G-3/G-4; STRETCH-2/3 on G-7.
 
 Dataset gates G-3/G-4/G-5 block the fidelity/real-palette ACs (AC-7/9/11/12/21); G-6 adds AC-17 held-out validation *evidence* (not the solver logic); G-7 gates STRETCH. Routing (G-2): AC-23 = post-prediction state transform (TUNE-4).
@@ -305,7 +305,8 @@ Dataset gates G-3/G-4/G-5 block the fidelity/real-palette ACs (AC-7/9/11/12/21);
 | SOLVER-6 | 06d76f91 | 2026-10-18 15:57 EDT | 16:15 | 18m 12s | 18m 12s | claude-opus-4-8 | 184 | 220,850 | 10,384,588 | 62,283 | 10,667,905 | AC-17 un-pended & green; coarse grid + successive refinement; 15 A re-grade; cov 143/143; fix 0/3 |
 | SOLVER-7 | a7c22cfd | 2026-10-18 20:19 EDT | 20:43 | 24m 11s | 24m 11s | claude-opus-4-8 | 176 | 252,185 | 11,434,831 | 91,063 | 11,778,255 | AC-20 un-pended & green; SOLVER module complete; 16 A re-grade; cov forward 65/65 inverse 146/146; fix 0/3 |
 | TUNE-2 | e9af57c3 | 2026-10-18 21:01 EDT | 21:32 | 30m 48s | 30m 48s | claude-opus-4-8 | 176 | 341,464 | 14,452,798 | 111,114 | 14,905,552 | AC-22 un-pended & green; chroma-penalty tie-break; 17 A re-grade, 0 downgrades; cov 148/148 + 2/2; fix 1/3 |
-| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-18 21:32** | **13h 10m** | **7h 31m** |  | **3,654** | **6,115,727** | **207,965,713** | **1,582,648** | **215,667,742** |  |
+| TUNE-4 | b9024ea1 | 2026-10-19 05:20 EDT | 05:36 | 16m 55s | 16m 55s | claude-opus-4-8 | 140 | 242,155 | 8,572,317 | 59,382 | 8,873,994 | AC-23 wet/dry un-pended & green; post-prediction state transform; 18 A re-grade, 0 downgrades; cov 47/47+19/19+15/15; fix 0/3 |
+| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-19 05:36** | **13h 27m** | **7h 47m** |  | **3,794** | **6,357,882** | **216,538,030** | **1,642,030** | **224,541,736** |  |
 
 ## Sign-off
 
