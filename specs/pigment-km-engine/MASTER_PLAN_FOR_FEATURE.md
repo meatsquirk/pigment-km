@@ -1,7 +1,7 @@
 # Master Plan — pigment_km: measured-pigment Kubelka–Munk mixing engine
 
 **Spec:** [pigment-km-engine.feature](../pigment-km-engine.feature)
-**Status:** In progress — TUNE-4 ✅ 2026-10-19 (AC-23 wet/dry un-pended, green; per-medium wet→dry as a post-prediction state transform, acrylic darker+hue-shifted / oil deferred; solve stays option-free (G-2); 18 A re-grade, 0 downgrades; cov 47/47·19/19·15/15; 18 ACs un-pended / 9 pending). Next startable: PROD-2/PROD-3.
+**Status:** In progress — PROD-2 ✅ 2026-10-19 (AC-24 provenance tiering un-pended, green; recipe tier = weakest input, estimated<calculated<measured<confirmed; dataset→Calculated, user tube→Measured; 19 A re-grade, 0 downgrades; cov 146/146·9/9; 19 ACs un-pended / 8 pending). Next startable: PROD-3.
 **Architecture:** [Nuance/docs/custom-mixing-engine-design.md](../../../Nuance/docs/custom-mixing-engine-design.md) (physics §3, datasets §4, forward/inverse §6, tuning §7, staged plan §8, licensing §13) · [Nuance/docs/paint-color-app-solution-intent.md](../../../Nuance/docs/paint-color-app-solution-intent.md) (D3/D6/D7/D9, accuracy NFRs) · consumption contract: `Nuance/lib/recipes/engine/mixing_engine.dart` (bs-04)
 **Code home:** `/Users/matthew.quirk/pigment_km` · remote `https://github.com/meatsquirk/pigment-km` (origin, pushed) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
 
@@ -78,7 +78,7 @@ Greenfield — nothing exists yet; every AC is net-new. The gap is the whole lib
 | AC-21 | The curated default palette cannot produce neon mixes | ITEST-4 `TestAC21_NoNeon` | TUNE-3 | ⬜ Todo |
 | AC-22 | The chroma penalty breaks ΔE00 ties toward the more muted recipe | ITEST-4 `TestAC22_ChromaPenalty` | TUNE-2 | ✅ Done |
 | AC-23 | The wet/dry toggle shifts the prediction by the documented offset | ITEST-4 `TestAC23_WetDry` | TUNE-4 | ✅ Done |
-| AC-24 | Recipes from measured data are Calculated, user tubes Measured | ITEST-4 `TestAC24_Provenance` | PROD-2 | ⬜ Todo |
+| AC-24 | Recipes from measured data are Calculated, user tubes Measured | ITEST-4 `TestAC24_Provenance` | PROD-2 | ✅ |
 | AC-25 | The measured-pigment engine and a baseline engine are interchangeable | ITEST-4 `TestAC25_ABEngines` | PROD-3 | ⬜ Todo |
 | AC-26 | A glaze over a ground predicts via the layering equation | ITEST-4 `TestAC26_Glazing` (@stretch) | STRETCH-2 | ⬜ Todo (G-7) |
 | AC-27 | Illuminant-fragile matches are flagged with a metamerism index | ITEST-4 `TestAC27_Metamerism` (@stretch) | STRETCH-3 | ⬜ Todo (G-7) |
@@ -166,7 +166,7 @@ Pre-seeded augmentations: AC-7/AC-11/AC-21 strengthened by DATA-5/DATA-7/TUNE-3 
 | FORWARD | [modules/FORWARD.md](modules/FORWARD.md) | `forward()` engine over measured pigments | COLOR, KM, DATA | 🔄 In progress (FORWARD-2 ✅) |
 | SOLVER | [modules/SOLVER.md](modules/SOLVER.md) | `inverse()` palette-constrained solver | FORWARD | ✅ Done (SOLVER-2..7) |
 | TUNE | [modules/TUNE.md](modules/TUNE.md) | Natural-colour tuning: curated palette, chromaPenalty, wet/dry | SOLVER, DATA | 🔄 In progress (TUNE-2 ✅, TUNE-4 ✅; TUNE-3 ↔ G-3) |
-| PROD | [modules/PROD.md](modules/PROD.md) | Provenance wiring, baseline engine + A/B, interface freeze | SOLVER | ⬜ Todo |
+| PROD | [modules/PROD.md](modules/PROD.md) | Provenance wiring, baseline engine + A/B, interface freeze | SOLVER | 🔄 In progress (PROD-2 ✅) |
 | STRETCH | [modules/STRETCH.md](modules/STRETCH.md) | Finite-layer glazing, metamerism (optional, G-7) | FORWARD, COLOR | ⬜ Todo |
 | ITEST | [modules/ITEST.md](modules/ITEST.md) | Acceptance integration suite: one pending test per AC, and its review | CORE, DATA shells | ✅ Done (ITEST-1..5; G-2 approved 2026-10-16) |
 
@@ -250,8 +250,8 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 | 30 | TUNE-2 | AC-22 chromaPenalty | ✅ Done | 14.91M | 30m 48s | AC-22 un-pended & green; λ=1e-6 chroma-penalty tie-break (`chroma_penalty.dart`) off in raw ranking; out-of-gamut reads true ΔE00 min; constructed 3-paint-muted vs 2-paint-vivid tie discriminates from AC-15 fewer-paints; 17 A re-grade; fix 1/3 |
 | 31 | TUNE-3 | AC-21 curated palette | ⬜ Todo | | | real palette ↔ G-3 |
 | 32 | TUNE-4 | AC-23 wet/dry | ✅ Done | 8.87M | 16m 55s | AC-23 un-pended & green; per-medium wet→dry as a post-prediction state transform (`wet_dry.dart`: XYZ→L*C*h + documented offset → consistent triple); acrylic `WetDryTransform(-3,1.5,3)` (dry darker+hue-shifted), oil none (G-4/G-5); `inverse` reads `opts.wet`, solve stays option-free (G-2); parts/ΔE00 unchanged; 18 A re-grade; cov 47/47·19/19·15/15; fix 0/3 |
-| 33 | PROD-2 | AC-24 provenance | ⬜ Next | | | |
-| 34 | PROD-3 | AC-25 A/B engines | ⬜ Todo | | | |
+| 33 | PROD-2 | AC-24 provenance | ✅ Done | 7.07M | 12m 45s | AC-24 un-pended & green; recipe tier = weakest input (estimated<calculated<measured<confirmed); new `engine/provenance.dart`; dataset→Calculated, user tube→Measured; 19 A re-grade, 0 downgrades; cov 146/146·9/9; fix 0/3; DATA-7 dep was drift |
+| 34 | PROD-3 | AC-25 A/B engines | ⬜ Next | | | |
 | 35 | STRETCH-2 | AC-26 glazing | ⬜ Todo | | | G-7 |
 | 36 | STRETCH-3 | AC-27 metamerism | ⬜ Todo | | | G-7 |
 | 37 | SIGNOFF-1 | sign-off: packet + summary + manual approval | ⬜ Todo | | | |
@@ -260,14 +260,13 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 
 ## Next phase
 
-**TUNE-4 ✅ (2026-10-19): AC-23 wet/dry un-pended, green.** The wet/dry choice is a post-prediction display state, not a solver parameter (G-2). New `lib/src/tune/wet_dry.dart` — `toDryState(Recipe, WetDryTransform)` re-renders only `colour` (parts/ΔE00/provenance/gamut/verdict unchanged) via `driedColour`: XYZ→CIELAB→L*C*h + the offset's deltas (chroma clamped ≥0, hue wrapped), back through the colour backend's own matrices to a consistent sRGB/XYZ/OKLCh triple; identity short-circuits. `saunderson.dart` gives acrylic a documented `WetDryTransform(-3, 1.5, 3)` (dry darker+deeper+hue-shifted), oil `none` (deferred to G-4/G-5). `custom_km_engine.dart`: `inverse` returns the solve unchanged when `opts.wet`, else maps each recipe through `toDryState(r, configForMedium(r.medium).wetDry)` — `forward`/the solve stay option-free. Grade gate: 18 A, 0 downgrades; cov wet_dry 47/47·saunderson 19/19·engine 15/15; fix 0/3. 18 un-pended / 9 pending.
+**PROD-2 ✅ (2026-10-19): AC-24 provenance tiering un-pended, green.** A recipe's honesty tier is now derived as *no stronger than its weakest input*. New `lib/src/engine/provenance.dart` — `recipeProvenance(Iterable<Pigment>)` returns the weakest pigment tier by `estimated(0) < calculated(1) < measured(2) < confirmed(3)`; empty → `estimated`. `inverse.dart`'s old `_recipeProvenance` (`any estimated ? estimated : calculated`) is deleted; its single Recipe-construction call site now calls `recipeProvenance(subset)`. So a recipe from the shipped measured dataset (paints `calculated`) is **Calculated**, one from only the user's own measured tube is **Measured**, and leaning on a dataset paint drops it to Calculated (D-8). `custom_km_engine.dart` unchanged (delegates to the solver). Grade gate: 19 A, 0 downgrades; cov inverse 146/146·provenance 9/9; fix 0/3. 19 un-pended / 8 pending. *The plan's DATA-7 dependency was spurious drift — AC-24 is pure tiering logic over re-tagged `synthPigments()`, needing only SOLVER-7 (see PROD.md Phase-2 note).*
 
 **Next, startable now (no gate):**
-- **PROD-2** (AC-24 provenance) ⬜ Next — the provenance tiering (Calculated from shipped measured data, Measured from a user's own tube). PROD scope (`lib/src/engine/*`, provenance labelling).
-- Also startable: **PROD-3** (AC-25 A/B engines). PROD-3 touches `lib/src/engine/*` (merge-risky with PROD-2 and any engine phase) — confirm file ownership per module plans before parallel runs.
+- **PROD-3** (AC-25 A/B engines) ⬜ Next — complete the single-constant `SpectralBaselineEngine` behind `MixingEngine` + the A/B harness (`ab/ab_harness.dart`); freeze the interface. Touches `lib/src/engine/*`; no other engine phase in flight.
 - **Gate-blocked:** DATA-5 (AC-7)/DATA-7 (AC-11)/TUNE-3 (AC-21) on G-3; DATA-6 (AC-9) on G-4; FORWARD-3 (AC-12) on G-3/G-4; STRETCH-2/3 on G-7.
 
-Dataset gates G-3/G-4/G-5 block the fidelity/real-palette ACs (AC-7/9/11/12/21); G-6 adds AC-17 held-out validation *evidence* (not the solver logic); G-7 gates STRETCH. Routing (G-2): AC-23 = post-prediction state transform (TUNE-4).
+After PROD-3, SIGNOFF-1's remaining dependencies are DATA-7 (G-3) and STRETCH-3 (G-7) — both gate-blocked — so sign-off waits on those gates. Dataset gates G-3/G-4/G-5 block the fidelity/real-palette ACs (AC-7/9/11/12/21); G-6 adds AC-17 held-out validation *evidence* (not solver logic); G-7 gates STRETCH.
 
 ## Token usage
 
@@ -306,7 +305,8 @@ Dataset gates G-3/G-4/G-5 block the fidelity/real-palette ACs (AC-7/9/11/12/21);
 | SOLVER-7 | a7c22cfd | 2026-10-18 20:19 EDT | 20:43 | 24m 11s | 24m 11s | claude-opus-4-8 | 176 | 252,185 | 11,434,831 | 91,063 | 11,778,255 | AC-20 un-pended & green; SOLVER module complete; 16 A re-grade; cov forward 65/65 inverse 146/146; fix 0/3 |
 | TUNE-2 | e9af57c3 | 2026-10-18 21:01 EDT | 21:32 | 30m 48s | 30m 48s | claude-opus-4-8 | 176 | 341,464 | 14,452,798 | 111,114 | 14,905,552 | AC-22 un-pended & green; chroma-penalty tie-break; 17 A re-grade, 0 downgrades; cov 148/148 + 2/2; fix 1/3 |
 | TUNE-4 | b9024ea1 | 2026-10-19 05:20 EDT | 05:36 | 16m 55s | 16m 55s | claude-opus-4-8 | 140 | 242,155 | 8,572,317 | 59,382 | 8,873,994 | AC-23 wet/dry un-pended & green; post-prediction state transform; 18 A re-grade, 0 downgrades; cov 47/47+19/19+15/15; fix 0/3 |
-| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-19 05:36** | **13h 27m** | **7h 47m** |  | **3,794** | **6,357,882** | **216,538,030** | **1,642,030** | **224,541,736** |  |
+| PROD-2 | 6545e916 | 2026-10-19 05:41 EDT | 05:54 | 12m 45s | 12m 45s | claude-opus-4-8 | 144 | 191,626 | 6,837,961 | 38,590 | 7,068,321 | AC-24 provenance tiering un-pended & green; 19 A re-grade, 0 downgrades; cov 146/146·9/9; fix 0/3 |
+| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-19 05:54** | **13h 40m** | **8h 00m** |  | **3,938** | **6,549,508** | **223,375,991** | **1,680,620** | **231,610,057** |  |
 
 ## Sign-off
 

@@ -5,9 +5,9 @@ import '../types/colour_value.dart';
 import '../types/medium.dart';
 import '../types/mix_options.dart';
 import '../types/pigment.dart';
-import '../types/provenance.dart';
 import '../types/recipe.dart';
 import 'forward.dart';
+import 'provenance.dart';
 
 /// The inverse solver (design §6.2) — SOLVER-2 the palette-constrained search,
 /// SOLVER-3 the ranking (best-first by ΔE00, preferring fewer paints on a tie),
@@ -280,20 +280,11 @@ Recipe _bestRecipeForSubset(
     parts: bestParts,
     colour: bestColour,
     deltaE00: bestDelta,
-    provenance: _recipeProvenance(subset),
+    provenance: recipeProvenance(subset),
     outOfGamut: false,
     verdict: 'ΔE00 ${bestDelta.toStringAsFixed(2)}',
   );
 }
-
-/// The honesty tier of a recipe: no stronger than its weakest input. A mix that
-/// draws on any [Provenance.estimated] paint is itself estimated; otherwise it is
-/// a model [Provenance.calculated] result. (PROD-2/AC-24 refines the
-/// measured-tube vs calculated distinction.)
-Provenance _recipeProvenance(List<Pigment> subset) =>
-    subset.any((p) => p.provenance == Provenance.estimated)
-        ? Provenance.estimated
-        : Provenance.calculated;
 
 /// Every size-[k] subset of [palette], in input order.
 Iterable<List<Pigment>> _subsetsOfSize(List<Pigment> palette, int k) sync* {
