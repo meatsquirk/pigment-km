@@ -321,8 +321,11 @@ Iterable<List<int>> _compositions(int total, int parts) sync* {
   }
 }
 
-/// CIE standard illuminant D65, 2° observer, reference white (normalized Y = 1).
-const Xyz _d65White = (x: 0.95047, y: 1.0, z: 1.08883);
+/// CIE standard illuminant D65, 10° observer, reference white (normalized
+/// Y = 1). The 10° observer (G-9 / D-14) matches the Golden/RIT acrylic
+/// dataset's published D65/10° L\*a\*b\*, so XYZ→Lab→ΔE00 is observer-consistent
+/// with the measured data.
+const Xyz _d65White = (x: 0.94811, y: 1.0, z: 1.07304);
 
 /// CIELAB L*a*b* of an XYZ tristimulus value under D65 — the library's own
 /// colour-difference maths (independent of the acceptance suite's reference).

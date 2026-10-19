@@ -7,10 +7,11 @@ import 'package:pigment_km/pigment_km.dart';
 /// These are the *test's own* yardstick — deliberately independent of the
 /// library's internal colour maths — so an AC test that asserts "ΔE00 ≤ 1"
 /// measures the library's output against a trusted reference, not against the
-/// library's own metric. CIE standard illuminant D65, 2° observer.
+/// library's own metric. CIE standard illuminant D65, 10° observer (G-9 / D-14 —
+/// the observer the measured paint data publishes its colours under).
 
-/// The CIE D65 2° reference white (normalized Y = 1).
-const Xyz _d65White = (x: 0.95047, y: 1.0, z: 1.08883);
+/// The CIE D65 10° reference white (normalized Y = 1).
+const Xyz _d65White = (x: 0.94811, y: 1.0, z: 1.07304);
 
 /// The sRGB inverse electro-optical transfer function: one gamma-encoded
 /// channel (0..1) to its linear-light value.

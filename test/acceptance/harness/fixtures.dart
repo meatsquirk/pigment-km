@@ -29,11 +29,12 @@ final Spectrum perfectDiffuser = CanonicalGrid.checkLength(
 typedef RefSpectrum = ({Spectrum spectrum, Xyz publishedXyz, Srgb publishedSrgb});
 
 /// The perfect diffuser is, by definition, the illuminant's white point: under
-/// CIE D65 (2° observer, normalized Y=1) its XYZ is (0.95047, 1.0, 1.08883) and
-/// its sRGB is pure white. A correct COLOR backend must reproduce this (AC-1).
+/// CIE D65 (10° observer — G-9/D-14, normalized Y=1) its XYZ is
+/// (0.94811, 1.0, 1.07304) and its sRGB is pure white. A correct COLOR backend
+/// must reproduce this (AC-1).
 final RefSpectrum refSpectrumColour = (
   spectrum: perfectDiffuser,
-  publishedXyz: (x: 0.95047, y: 1.0, z: 1.08883),
+  publishedXyz: (x: 0.94811, y: 1.0, z: 1.07304),
   publishedSrgb: (r: 1.0, g: 1.0, b: 1.0),
 );
 

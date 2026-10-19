@@ -1,6 +1,6 @@
 # Module COLOR — spectrum → colour backend
 
-**Status:** 🔄 In progress — COLOR-2 ✅, COLOR-3 ✅; **COLOR-4 ⬜ (10° observer re-base — G-9)**
+**Status:** ✅ Done — COLOR-2 ✅, COLOR-3 ✅, COLOR-4 ✅ (10° observer re-base — G-9/D-14)
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/colour/spectrum_to_colour.dart`, `lib/src/colour/gamut_map.dart`, `lib/src/colour/cmf_d65_weights.dart` (precomputed x̄·D65, ȳ·D65, z̄·D65 on the canonical grid), `lib/src/colour/oklch.dart`. COLOR-4 additionally edits the **Lab reference white** used for ΔE00 in `lib/src/engine/inverse.dart` (`_d65White`) and the **independent yardstick white** in `test/acceptance/harness/colour_math.dart` — cross-module touches that must be serialized (run COLOR-4 before grading STRETCH-2/3; no concurrent FORWARD/SOLVER/TUNE phase).
 **Depends on:** CORE · **Blocks:** FORWARD, STRETCH; **COLOR-4 blocks** DATA-5, FORWARD-3, TUNE-3 (and the oil fidelity of DATA-6)
@@ -11,7 +11,7 @@
 |---|---|---|---|---|---|
 | 2 (COLOR-2) | behavior | AC-1 | ✅ Done | 7.64M | 17m 38s |
 | 3 (COLOR-3) | behavior | AC-2 | ✅ Done | 11.82M | 30m 37s |
-| 4 (COLOR-4) | behavior | AC-1 (re-base) + whole-suite re-grade | ⬜ Next | | |
+| 4 (COLOR-4) | behavior | AC-1 (re-base) + whole-suite re-grade | ✅ Done | 14.90M | 30m 47s |
 
 ## Interface reconciliation
 
@@ -101,8 +101,27 @@ OKLCh gamut mapper landed; AC-2 un-pended and green. COLOR module complete.
 
 ### Result
 
-_(pending — COLOR-4 not yet run.)_
+Colour pipeline re-based from the CIE 1931 2° to the CIE 1964 10° observer (G-9 / D-14); AC-1 re-confirmed green, whole suite green, 22 A.
+
+- **Landed (constants/doc-only, no signature or logic change):**
+  - `lib/src/colour/cmf_d65_weights.dart` — the three `CMF·D65` weight vectors + `yBarD65Sum` recomputed from the **CIE 1964 10°** CMF × D65 SPD on the 400–700@10 grid. `yBarD65Sum` 1056.5085298462 → **1161.6771622677738**. Header updated (observer, provenance, white points).
+  - **Lab reference white** moved `(0.95047, 1.0, 1.08883)` → the standard 10° white **(0.94811, 1.0, 1.07304)** in `lib/src/engine/inverse.dart` (`_d65White`) **and** `lib/src/tune/wet_dry.dart` (`_d65White` — not in the plan's file list, but its own comment requires it stay in lock-step with `inverse.dart`; a stray 2° white there would defeat D-14) **and** the acceptance yardstick `test/acceptance/harness/colour_math.dart`. Doc comments in `spectrum_to_colour.dart` and `forward.dart` updated 2°→10°.
+  - Fixture `refSpectrumColour.publishedXyz` and unit `canonicalD65` → the 10° white (both the perfect diffuser's white point under D65/10°); AC-1 test's hardcoded published-XYZ + "CIE 1931" comment updated.
+- **How the 10° data was sourced (authoritative + validated):** regenerated with the `colour-science` package (the same source COLOR-2's 2° weights cite). The method was **validated by first reproducing the prior 2° vectors exactly** (`xBarD65[0]` and `yBarD65Sum` to 0 diff) before switching the CMF to 1964 10°. The standard ASTM-E308 D65/10° white (0.94811, 1.0, 1.07304) was used for the Lab reference (matching the repo's convention of the clean standard white and the observer the dataset's published Lab is computed against), confirmed against colour-science's xy-derived (0.94810, 1.0, 1.07305).
+- **Verification:** `dart analyze` → 1 pre-existing `info` (`prefer_const_declarations` at `test/chroma_penalty_test.dart:38`, a TUNE-2 file present at BASE, untouched by COLOR-4 — not a regression; the 5 touched files are clean). Unit `dart test` → **207 passed / 7 skipped / 0 failed**. Coverage gate (vs BASE `b2eeace`) → **PASS**: `cmf_d65_weights.dart` no executable lines; `spectrum_to_colour.dart` 14/14; `forward.dart` 65/65; `inverse.dart` 146/146; `wet_dry.dart` 47/47. Acceptance default `dart test test/acceptance` → **29 passed / 7 skipped** (all 20 un-pended ACs green). Run-pending red baseline `PIGMENT_KM_RUN_PENDING=true dart test test/acceptance -x stretch` → **28 passed / 5 failed**, each pending AC red for the right reason naming its owner (AC-7→G-3/DATA-5, AC-9→G-4/DATA-6, AC-11→G-3/DATA-7, AC-12→FORWARD-3, AC-21→TUNE-3). `@stretch` AC-26/27 excluded.
+- **Acceptance gate (AC-1):** re-confirmed green against the 10° `refSpectrumColour` — ΔE00 **0.084** ≤ 1 (published Lab is exactly (100,0,0); residual is the 400–700 nm truncation). Margin 0.92.
+- **Grades:** fresh independent adversarial grader re-graded **every** un-pended AC (the DATA-8 pattern) — **22 A / 0 B, 0 downgrades, 0 fixes**. All absolute-threshold tests keep ≥0.9 ΔE00 head-room because engine colour and yardstick white moved in lockstep; relative/off-path tests are structurally insensitive. Details + per-AC margins in `behavior-test-completeness-pigment-km-engine.md` (COLOR-4 section).
+- **Test maintenance (re-grounding to the approved observer G-9, not weakening any AC):** `refSpectrumColour.publishedXyz`, the two Lab reference whites (yardstick + wet_dry/inverse), the AC-1 published-XYZ assertion and the unit `canonicalD65` all moved to the 10° white. The `yBarD65Sum == Σ yBarD65` unit assertion still holds at the new value.
+- **Fix passes:** 0/3 (green on the first full run).
+- **Tokens / Time:** 14.90M / 30m 47s (incl. the re-grade subagent).
 
 ### Checkpoint / Handoff
 
-_(to be written when COLOR-4 completes: the frozen 10° constants + white points, the re-grade outcomes, and the green light for DATA-5/FORWARD-3/TUNE-3.)_
+- **Frozen 10° constants (don't reshape without a reconciliation note):**
+  - `cmf_d65_weights.dart`: `xBarD65`/`yBarD65`/`zBarD65` (length 31) are the CIE 1964 10° CMF × D65 products; `yBarD65Sum = 1161.6771622677738`.
+  - Lab reference white (ΔE00 maths): **(0.94811, 1.0, 1.07304)** — the standard D65/**10°** white, used identically in `inverse.dart` (`_d65White`), `wet_dry.dart` (`_d65White`) and the acceptance yardstick `colour_math.dart`. Keep these three in lock-step; a later phase that needs a Lab white must reuse this value.
+  - `spectrumToColour`/`gamutMap`/barrel public signatures and the sRGB display matrix + gamma are **unchanged** from COLOR-3.
+- **Verification commands (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"` first. Analyze `dart analyze`; unit `dart test`; coverage `bash tool/coverage_gate.sh <BASE>`; acceptance default `dart test test/acceptance`, red-baseline `PIGMENT_KM_RUN_PENDING=true dart test test/acceptance -x stretch`.
+- **Green light for DATA-5 / FORWARD-3 / TUNE-3:** the colour pipeline now matches the Golden/RIT acrylic dataset's D65/10° published Lab, so published-colour fidelity ACs are built against this basis. **DATA-5 (AC-7) is now unblocked** — the G-3 acrylic data is in hand and the observer mismatch (G-9) that was its only remaining blocker is resolved. The dataset's published colours must be compared under the 10° white (it is now the engine's), with no observer conversion.
+- **Oil risk (carried to G-5):** COLOR-4 adopts 10° **globally**. If the MPI oil dataset (DATA-6) publishes 2° Lab, its fidelity must reconcile the observer (render MPI raw spectra through the 10° pipeline, or convert its published Lab) — COLOR-4 does not block on G-5.
+- **Known gaps:** none for AC-1/AC-2. The pre-existing `prefer_const_declarations` info in `test/chroma_penalty_test.dart:38` is inherited TUNE-2 debt in an untouched file (fix it in a TUNE-owned touch, not here).

@@ -518,3 +518,34 @@ Result: 19 A.
 | AC-24 | TestAC24_Provenance | A (re-confirmed) | `recipeProvenance` untouched (the baseline reuses it read-only); recipe provenance tiering unchanged. Passes un-skipped. |
 
 Result: 20 A.
+
+## Behaviour re-grade — COLOR-4 (10° observer re-base; re-grade every un-pended AC) · graded 2026-10-19
+
+**22 A, 0 B, 0 downgrades, 0 fixes** (22 test rows across the 20 un-pended ACs). Fresh independent adversarial grader (G1–G6), given the prior PROD-3 grid and asked to justify any downgrade against a named rule. COLOR-4 re-bases the colour pipeline from the CIE 1931 2° to the CIE 1964 10° observer (D-14 / G-9). The grader first confirmed the change is **constants/doc-only** — `cmf_d65_weights.dart` (three weight vectors + `yBarD65Sum`=1161.677 recomputed from the 10° CMF×D65; the method validated by reproducing the prior 2° vectors exactly from the same `colour-science` source) and the **Lab reference white** `(0.95047,1.0,1.08883)`→`(0.94811,1.0,1.07304)` moved in lockstep across `inverse.dart`, `wet_dry.dart` and the acceptance yardstick `colour_math.dart`, plus the AC-1 fixture/unit white and doc comments — with no signature or logic change. Every engine colour output shifts ≈0.1–0.5 ΔE00.
+
+**No AC weakened or flipped.** Because the engine colour *and* the independent yardstick white moved together, every relative-ΔE00 / off-colour-path test is structurally insensitive, and every absolute-threshold test keeps ≥0.9 ΔE00 head-room (measured by the grader via a throwaway probe, not estimated): **AC-1** ΔE00 0.084 vs ≤1 (published XYZ is still an independent CIE constant, so a mis-normalized/unweighted backend still fails); **AC-17** best 4.06 vs ≤5 (reachable aug 0.045 vs a ≈6.4 coarse-grid miss — refinement reject intact); **AC-18** 32.45 vs >5; **AC-23** dE(dry,wet) 3.09 vs >0.5, dryY<wetY, hue +3.0°. **AC-13** relative chroma 0.0125 (KM mix) < 0.0372 (RGB blend) — the subtractive-vs-additive inequality cannot flip. **AC-2** is untouched by the re-base (OKLab-space mapper, hardcoded OOG input; the 1e-6 hidden-hard-clip reject holds at red = −1.0e-7).
+
+| AC | Test | Grade | Notes |
+|---|---|---|---|
+| AC-1 | TestAC01_SpectrumToColour | **A** (re-based) | ΔE00 **0.084** vs ≤1 (margin 0.92); engine + published white re-based in lockstep, residual = documented 400–700 nm truncation; Y=1.0 exact, sRGB white; rejects dropped-illuminant / wrong-normalization. |
+| AC-2 | TestAC02_GamutMap | A (re-confirmed) | Untouched by the re-base (OKLab mapper, own matrices, hardcoded OOG fixture); unclamped reported-linear red −1.0e-7 inside ±1e-6 by 10× — hidden-hard-clip reject intact. |
+| AC-3 | TestAC03_KmRoundTrip | A (re-confirmed) | Off colour path. Physical [0,1] + reciprocal-root reject + K/S=0→R=1 + round-trip. |
+| AC-4 | TestAC04_Saunderson | A (re-confirmed) | Off colour path. Per-bin full formula + anchor + per-medium/no-op controls. |
+| AC-5 | TestAC05_TwoConstantMix | A (re-confirmed) | Relative ΔE00 (self-mix & order equality <1e-6, controls >1); all engine outputs move together. |
+| AC-6 | TestAC06_Artifact | A (re-confirmed) | Off colour path. Field checks + decode-equality. |
+| AC-8 | TestAC08_Resample | A (re-confirmed) | Off colour path. Linear-ramp 1e-5 + nearest-bin reject. |
+| AC-10 | TestAC10_MasstoneTint | A (re-confirmed) | Off colour path (independent opaque-KM reference, no colour space/white). |
+| AC-13 | TestAC13_Desaturation | A (re-confirmed) | Relative chroma: kmMix 0.0125 < rgbBlend 0.0372 (margin 0.0247, KM ~⅓); both from the same re-based engine → inequality unaffected; pures chromatic, hue diff 124°. |
+| AC-14 | TestAC14_Normalize | A (re-confirmed) | Asserts `normalizeParts` directly + scale-invariance <1e-6 + ratio control; relative. |
+| AC-15 | TestAC15_RankedPreferFewer (base + 6-twin tie) | A (re-confirmed) | Relative ordering/membership/Σ1; bit-exact tie → non-decreasing paint count; observer-independent. |
+| AC-16 | TestAC16_PaletteOnly | A (re-confirmed) | Membership only; no colour threshold. |
+| AC-17 | TestAC17_InGamut (base + reachable aug) | A (re-confirmed) | best.deltaE00 **4.06** vs ≤5 (tightest absolute margin, 0.94); reachable off-grid tint 0.045 vs ≈6.4 coarse-grid miss — refinement reject separated; yardstick + solver both re-based. |
+| AC-18 | TestAC18_OutOfGamut | A (re-confirmed) | best.deltaE00 **32.45** vs >5 (margin 27.4), flagged, verdict "out of gamut"; G3 pair for AC-17. |
+| AC-19 | TestAC19_CrossMedium (+ oil control) | A (re-confirmed) | Single-medium partition + relative oil/acrylic ΔE00 control. |
+| AC-20 | TestAC20_Performance (+ maxPaints=8 aug) | A (re-confirmed) | Timing/count only; re-base adds negligible compute; capped-vs-uncapped reject intact. |
+| AC-22 | TestAC22_ChromaPenalty (base + constructed tie) | A (re-confirmed) | Constructed tie equalizes the engine's own `deltaE2000Xyz` by bisection → observer-independent; penalty-ON promotes 3-paint muted ahead of 2-paint vivid. |
+| AC-23 | TestAC23_WetDry | A (re-confirmed) | dE(dry,wet) **3.09** vs >0.5 (margin 2.59); dryY 0.129 < wetY 0.150 (darker), hue +3.0°>0.5°; parts unchanged (state transform); direction config-pinned; wet_dry white re-based in lockstep. |
+| AC-24 | TestAC24_Provenance | A (re-confirmed) | Provenance labels only; off colour path. |
+| AC-25 | TestAC25_ABEngines | A (re-confirmed) | Relative: finite non-negative ΔE00 per swatch, both engines behind one `MixingEngine` call. |
+
+Result: 22 A. (Pending AC-7/9/11/12/21/26/27 authored against the 10° basis in their own later phases — not graded here.)

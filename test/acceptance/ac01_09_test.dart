@@ -27,10 +27,11 @@ void main() {
       // published colour (the perfect diffuser → the D65 white point).
       final ref = refSpectrumColour;
       expect(ref.spectrum, hasLength(CanonicalGrid.bins));
-      expect(ref.publishedXyz, (x: 0.95047, y: 1.0, z: 1.08883));
+      expect(ref.publishedXyz, (x: 0.94811, y: 1.0, z: 1.07304));
       expect(ref.publishedSrgb, (r: 1.0, g: 1.0, b: 1.0));
 
-      // WHEN the colour backend converts it (D65 illuminant, CIE 1931 observer).
+      // WHEN the colour backend converts it (D65 illuminant, CIE 1964 10°
+      // observer — G-9/D-14).
       final result = spectrumToColour(ref.spectrum);
 
       // THEN the result matches the published colour within ΔE00 ≤ 1 (the AC

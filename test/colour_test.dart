@@ -16,8 +16,9 @@ void main() {
   Spectrum flat(double r) =>
       Float32List.fromList(List<double>.filled(CanonicalGrid.bins, r));
 
-  /// The full-range CIE D65 white point (what a perfect diffuser approximates).
-  const canonicalD65 = (x: 0.95047, y: 1.0, z: 1.08883);
+  /// The full-range CIE D65/10° white point (what a perfect diffuser
+  /// approximates — G-9/D-14, the observer the colour pipeline now uses).
+  const canonicalD65 = (x: 0.94811, y: 1.0, z: 1.07304);
 
   group('cmf_d65_weights (precomputed CMF·D65)', () {
     test('each weight vector has exactly one sample per canonical bin', () {

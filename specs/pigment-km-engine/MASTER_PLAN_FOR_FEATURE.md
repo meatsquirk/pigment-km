@@ -1,7 +1,7 @@
 # Master Plan — pigment_km: measured-pigment Kubelka–Munk mixing engine
 
 **Spec:** [pigment-km-engine.feature](../pigment-km-engine.feature)
-**Status:** In progress — next **COLOR-4** (10° observer re-base, G-9), which unblocks DATA-5/FORWARD-3/TUNE-3 fidelity; **STRETCH-2/STRETCH-3** also startable now (G-7 ✅ Build). DATA-6 on G-4; DATA-7 attribution wording on G-3. 20 ACs un-pended / 7 pending.
+**Status:** In progress — COLOR-4 ✅ (10° re-base done; COLOR module complete). Next **DATA-5** (AC-7 acrylic round-trip — now unblocked: data in hand + 10° basis); **STRETCH-2/STRETCH-3** also startable (G-7 ✅). FORWARD-3/TUNE-3 unblocked by COLOR-4 (need their data specifics); DATA-6 on G-4; DATA-7 wording on G-3. 20 ACs un-pended / 7 pending.
 **Architecture:** [Nuance/docs/custom-mixing-engine-design.md](../../../Nuance/docs/custom-mixing-engine-design.md) (physics §3, datasets §4, forward/inverse §6, tuning §7, staged plan §8, licensing §13) · [Nuance/docs/paint-color-app-solution-intent.md](../../../Nuance/docs/paint-color-app-solution-intent.md) (D3/D6/D7/D9, accuracy NFRs) · consumption contract: `Nuance/lib/recipes/engine/mixing_engine.dart` (bs-04)
 **Code home:** `/Users/matthew.quirk/pigment_km` · remote `https://github.com/meatsquirk/pigment-km` (origin, pushed) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
 
@@ -55,7 +55,7 @@ Greenfield — nothing exists yet; every AC is net-new. The gap is the whole lib
 
 | AC | Scenario | Integration test (ITEST) | Behavior phases | Status |
 |---|---|---|---|---|
-| AC-1 | A reflectance spectrum converts to its expected colour | ITEST-2 `TestAC01_SpectrumToColour` | COLOR-2 · COLOR-4 (10° re-base) | ✅ (re-confirm in COLOR-4) |
+| AC-1 | A reflectance spectrum converts to its expected colour | ITEST-2 `TestAC01_SpectrumToColour` | COLOR-2 · COLOR-4 (10° re-base) | ✅ (re-based 10°, ΔE00 0.084) |
 | AC-2 | Colours outside sRGB are gamut-mapped, not clipped | ITEST-2 `TestAC02_GamutMap` | COLOR-3 | ✅ |
 | AC-3 | Kubelka–Munk reflectance and K/S round-trip | ITEST-2 `TestAC03_KmRoundTrip` | KM-2 | ✅ |
 | AC-4 | Saunderson correction round-trips per medium | ITEST-2 `TestAC04_Saunderson` | KM-3 | ✅ |
@@ -161,7 +161,7 @@ Pre-seeded augmentations: AC-7/AC-11/AC-21 strengthened by DATA-5/DATA-7/TUNE-3 
 | Module | Plan | Purpose | Depends on | Status |
 |---|---|---|---|---|
 | CORE | [modules/CORE.md](modules/CORE.md) | Package scaffold; canonical grid; core value types; `MixingEngine` interface + stub engines | — | ✅ Done |
-| COLOR | [modules/COLOR.md](modules/COLOR.md) | Spectrum→XYZ→sRGB backend + OKLCh gamut map | CORE | 🔄 In progress (COLOR-2 ✅, COLOR-3 ✅; COLOR-4 ⬜ 10° re-base) |
+| COLOR | [modules/COLOR.md](modules/COLOR.md) | Spectrum→XYZ→sRGB backend + OKLCh gamut map | CORE | ✅ Done (COLOR-2/3 ✅; COLOR-4 ✅ 10° re-base) |
 | KM | [modules/KM.md](modules/KM.md) | KM reflectance, Saunderson, two-constant mixing, concentration | CORE | ✅ Done (KM-2/3/4) |
 | DATA | [modules/DATA.md](modules/DATA.md) | Pigment data model, ingest, resample, NNLS/masstone-tint, build artifact, attribution | CORE, COLOR, KM | 🔄 In progress (DATA-1 ✅, DATA-8 ✅) |
 | FORWARD | [modules/FORWARD.md](modules/FORWARD.md) | `forward()` engine over measured pigments | COLOR, KM, DATA | 🔄 In progress (FORWARD-2 ✅) |
@@ -201,13 +201,13 @@ graph LR
 |---|---|---|---|---|
 | G-1 | decision | Approve the spec (record the approval as its first line) | CORE-1 | ✅ Resolved 2026-10-16: spec approved as-is, recorded as its first line — Matt Quirk |
 | G-2 | decision | Approve the acceptance tests (ITEST-5's packet) | every behavior phase | ✅ Resolved 2026-10-16 11:08 EDT: approved — Matt Quirk. Routing: AC-23 wet/dry = post-prediction state transform (`forward`/`inverse` stay option-free, TUNE-4); AC-5 un-pend moves KM-4 → FORWARD-2 |
-| G-3 | dependency | Obtain + archive the Golden/RIT acrylic K,S data; confirm its exact fields, grid, S-normalization and k1,k2 (design §4 action #2) and the agreed attribution wording with Berns/MCSL (permission granted 2026-10-15) | DATA-5, DATA-7, FORWARD-3, TUNE-3 (real palette) | ⏸ Data in hand 2026-10-19 (tool/ingest/raw/rit/, archived; fields/grid confirmed — see G-9); permission letter held 2026-10-17. Acquisition side satisfied; DATA-5 now blocked by the **observer mismatch — G-9**. DATA-7 attribution wording still to confirm (incl. IS&T paper-copyright). |
+| G-3 | dependency | Obtain + archive the Golden/RIT acrylic K,S data; confirm its exact fields, grid, S-normalization and k1,k2 (design §4 action #2) and the agreed attribution wording with Berns/MCSL (permission granted 2026-10-15) | DATA-5, DATA-7, FORWARD-3, TUNE-3 (real palette) | ⏸ Data in hand 2026-10-19 (tool/ingest/raw/rit/, archived; fields/grid confirmed — see G-9); permission letter held 2026-10-17. Acquisition side satisfied; the observer mismatch (G-9) is resolved by **COLOR-4 ✅ 2026-10-19**, so **DATA-5 is unblocked**. DATA-7 attribution wording still to confirm (incl. IS&T paper-copyright). |
 | G-4 | dependency | Obtain the MPI Old Holland oil dataset (CC BY 4.0 — clear) and its mixtures | DATA-6 | Open |
 | G-5 | decision | Confirm per-medium Saunderson k1,k2 + S-normalization from each dataset README; **and the MPI oil dataset's colorimetric observer** (COLOR-4 adopts 10° globally — if MPI publishes 2° Lab, DATA-6 must reconcile) | DATA-5, DATA-6 (folds into G-3/G-4 acquisition) | Open |
 | G-6 | dependency | Spectrophotometer availability for held-out ΔE00 validation evidence (SI open decision #3); MPI mixtures give a no-instrument oil path | AC-17 validation confidence (SOLVER-6) | Open |
 | G-7 | decision | Confirm STRETCH (S6 glazing + metamerism) scope before building it | STRETCH-2, STRETCH-3 | ✅ Resolved 2026-10-19: **Build STRETCH** — glazing + metamerism confirmed in scope; STRETCH-2/3 startable; SIGNOFF-1 now also waits on STRETCH-2/3 — Matt Quirk |
 | G-8 | decision | Synthetic fixture renders chromatic paints as the complement of their names (absorption K peaked at the named hue) — fix the fixture to be hue-faithful, or retarget AC-17? | DATA-8, SOLVER-6 (AC-17) | ✅ Resolved 2026-10-17: fix the fixture (new DATA-8 enabler); AC-17 keeps a genuinely in-gamut target — Matt Quirk |
-| G-9 | decision | **Observer mismatch (surfaced DATA-5, 2026-10-19).** The Golden/RIT acrylic data is in hand (tool/ingest/raw/rit/, archived), fields/grid confirmed (Name, Prod #, % Reflectance, K/S, **published L\*a\*b\* under D65/10°**, on the 400–700@10 canonical grid — no resample). But the engine's colour pipeline is **CIE 1931 2°** (frozen COLOR, AC-1). Probe over all 78 paints: rendering each paint's measured reflectance (and, identically, its K/S column) through the 2° pipeline and comparing to the dataset's published Lab gives ΔE00 **max 6.75, mean 1.91, 66/78 > 0.5**, correlated with chroma (neutrals ≈ 0.05–0.11; saturated blues/yellows 4–6.7). AC-7 needs ≤ 0.5 for **every** paint — unachievable vs the dataset's 10° Lab with the 2° engine; no k1,k2/grid choice fixes an observer mismatch. **Decide:** (A) adopt a 10° observer for the colour pipeline to match the dataset [re-grade AC-1 + every colour-dependent AC; new COLOR phases]; (B) relax AC-7's threshold [spec change, weakens the AC]; (C) obtain/augment a dataset whose published colours are 2° (or raw spectra to render at 2°); (D) accept DATA-5 with a documented gap / keep AC-7 pending. | DATA-5, and the published-colour fidelity of FORWARD-3/TUNE-3 | ✅ Resolved 2026-10-19: **Adopt a 10° observer** for the colour pipeline to match the measured paint data — Matt Quirk. **Reshapes the plan** (changes frozen COLOR/AC-1): needs a plan-mode upgrade to add a colour re-base phase (recompute `cmf_d65_weights.dart` + white point for the CIE 10° observer) and re-grade AC-1 + every colour-dependent AC (COLOR/KM/FORWARD/SOLVER/TUNE/PROD). First confirm the MPI oil dataset's observer (fold into G-5) so oil fidelity isn't broken instead. Then DATA-5 (and FORWARD-3/TUNE-3 fidelity) can proceed. **Plan-mode upgrade done 2026-10-19: added COLOR-4 (10° re-base) + D-14; AC-1 + colour-dependent ACs re-graded there.** |
+| G-9 | decision | **Observer mismatch (surfaced DATA-5, 2026-10-19).** The Golden/RIT acrylic data is in hand (tool/ingest/raw/rit/, archived), fields/grid confirmed (Name, Prod #, % Reflectance, K/S, **published L\*a\*b\* under D65/10°**, on the 400–700@10 canonical grid — no resample). But the engine's colour pipeline is **CIE 1931 2°** (frozen COLOR, AC-1). Probe over all 78 paints: rendering each paint's measured reflectance (and, identically, its K/S column) through the 2° pipeline and comparing to the dataset's published Lab gives ΔE00 **max 6.75, mean 1.91, 66/78 > 0.5**, correlated with chroma (neutrals ≈ 0.05–0.11; saturated blues/yellows 4–6.7). AC-7 needs ≤ 0.5 for **every** paint — unachievable vs the dataset's 10° Lab with the 2° engine; no k1,k2/grid choice fixes an observer mismatch. **Decide:** (A) adopt a 10° observer for the colour pipeline to match the dataset [re-grade AC-1 + every colour-dependent AC; new COLOR phases]; (B) relax AC-7's threshold [spec change, weakens the AC]; (C) obtain/augment a dataset whose published colours are 2° (or raw spectra to render at 2°); (D) accept DATA-5 with a documented gap / keep AC-7 pending. | DATA-5, and the published-colour fidelity of FORWARD-3/TUNE-3 | ✅ Resolved 2026-10-19: **Adopt a 10° observer** for the colour pipeline to match the measured paint data — Matt Quirk. **Reshapes the plan** (changes frozen COLOR/AC-1): needs a plan-mode upgrade to add a colour re-base phase (recompute `cmf_d65_weights.dart` + white point for the CIE 10° observer) and re-grade AC-1 + every colour-dependent AC (COLOR/KM/FORWARD/SOLVER/TUNE/PROD). First confirm the MPI oil dataset's observer (fold into G-5) so oil fidelity isn't broken instead. Then DATA-5 (and FORWARD-3/TUNE-3 fidelity) can proceed. **Plan-mode upgrade done 2026-10-19: added COLOR-4 (10° re-base) + D-14; AC-1 + colour-dependent ACs re-graded there.** **Implemented 2026-10-19 by COLOR-4** (10° weights + Lab white; AC-1 ΔE00 0.084; 22 A, 0 fixes) — the colour-pipeline side of G-9 is closed; the oil-observer risk remains tracked under G-5. |
 
 Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 
@@ -240,7 +240,7 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 | 17 | DATA-2 | AC-8 resample | ✅ Done | 5.22M | 11m 07s | AC-8 un-pended, green; linear resampler onto canonical grid; cov 25/25; 12 A re-grade, 0 fixes |
 | 18 | DATA-3 | AC-6 artifact | ✅ Done | 6.06M | 11m 08s | `load` decodes the shipped asset (single source), memoised; AC-6 un-pended, green; cov 12/12; 13 A re-grade, 0 fixes |
 | 19 | DATA-4 | AC-10 masstone–tint | ✅ Done | 5.41M | 11m 24s | AC-10 un-pended, green; per-λ 2×2 least-squares K,S from masstone+tint series; backends_stub_test deleted (last stub done); cov 34/34; 14 A re-grade, 0 fixes |
-| 20 | DATA-5 | AC-7 round-trip fidelity | ⬜ Todo | | | needs G-3 |
+| 20 | DATA-5 | AC-7 round-trip fidelity | ⬜ Next | | | G-3 data in hand + 10° basis (COLOR-4) — unblocked |
 | 21 | DATA-6 | AC-9 oil fit | ⬜ Todo | | | needs G-4 |
 | 22 | DATA-7 | AC-11 attribution + provenance | ⬜ Todo | | | needs G-3 wording |
 | 23 | SOLVER-2 | AC-16 palette-only | ✅ Done | 9.98M | 17m 22s (1h 13m) | solver live; AC-16 un-pended, green; 7 A |
@@ -258,19 +258,19 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 | 35 | STRETCH-2 | AC-26 glazing | ⬜ Todo | | | G-7 |
 | 36 | STRETCH-3 | AC-27 metamerism | ⬜ Todo | | | G-7 |
 | 37 | SIGNOFF-1 | sign-off: packet + summary + manual approval | ⬜ Todo | | | |
-| 38 | COLOR-4 | 10° observer re-base (AC-1 re-base + whole-suite re-grade) — G-9 | ⬜ Next | | | runs next; unblocks DATA-5/FORWARD-3/TUNE-3; serialize (edits engine Lab white + yardstick) |
+| 38 | COLOR-4 | 10° observer re-base (AC-1 re-base + whole-suite re-grade) — G-9 | ✅ Done | 14.90M | 30m 47s | 10° weights + Lab white (incl. wet_dry.dart); AC-1 ΔE00 0.084; suite green; 22 A; unblocks DATA-5/FORWARD-3/TUNE-3; COLOR module ✅ |
 
 *Tokens* / *Time* = phase totals from the *Token usage* ledger (Time = active, wall in brackets), filled when a row is marked done.
 
 ## Next phase
 
-**Plan-mode upgrade 2026-10-19 (G-9 adopt-10°):** added **COLOR-4 — 10° observer re-base** (behavior; module COLOR back to 🔄). It recomputes `lib/src/colour/cmf_d65_weights.dart` (CIE 1931 2° → **CIE 1964 10°** CMF × D65) + `yBarD65Sum`, and moves the **Lab reference white** (`_d65White` in `lib/src/engine/inverse.dart` and the independent yardstick in `test/acceptance/harness/colour_math.dart`) to the 10° D65 white — so XYZ→Lab→ΔE00 is computed in the observer the Golden/RIT acrylic dataset publishes (D65/10°). `spectrumToColour`/`gamutMap`/barrel surface and the sRGB display matrix are **unchanged**. New design decision **D-14**.
+**COLOR-4 done 2026-10-19 (G-9/D-14):** the colour pipeline is re-based to the CIE 1964 10° observer — `cmf_d65_weights.dart` weight vectors + `yBarD65Sum` (1161.677) recomputed, and the Lab reference white moved to the standard 10° white (0.94811, 1.0, 1.07304) in lockstep across `inverse.dart`, `wet_dry.dart` (a third copy the plan's file-list had missed) and the acceptance yardstick. AC-1 ΔE00 0.084 ≤ 1; whole suite green; 22 A, 0 fixes. COLOR module complete.
 
-- **⬜ Next: COLOR-4.** Startable now (depends on COLOR-3 ✅ and G-9 ✅). Acceptance gate: AC-1 re-confirmed on the 10° `refSpectrumColour`; whole suite green (default + run-pending, `@stretch` excluded); red baseline re-recorded. Re-grades AC-1 + every colour-dependent un-pended AC (AC-2/5/13/14/15/17/18/22/23/25) in fresh subagents — the DATA-8 pattern. **Run serially** (it edits the engine Lab white + the acceptance yardstick and shifts every colour output).
-- **Also startable (own session):** STRETCH-2 (AC-26 glazing), STRETCH-3 (AC-27 metamerism) — G-7 ✅, independent of the acrylic dataset. Grade them **after** COLOR-4 so they land on the 10° basis (do not run concurrently with COLOR-4).
-- **Unblocked by COLOR-4:** DATA-5 (AC-7), FORWARD-3 (AC-12), TUNE-3 (AC-21) — their published-colour fidelity needs the 10° basis. DATA-5/TUNE-3 also need **G-3** (data in hand; DATA-7 wording still open); FORWARD-3 the measured mixtures.
+- **⬜ Next: DATA-5 (AC-7 acrylic round-trip fidelity).** Now unblocked — the G-3 Golden/RIT data is in hand (`tool/ingest/raw/rit/`) and the observer mismatch (G-9), its only remaining blocker, is resolved by COLOR-4. Compare the dataset's published D65/10° Lab directly (it is now the engine's observer; no conversion). Serialize vs other engine/ingest phases.
+- **Also startable (own session):** STRETCH-2 (AC-26 glazing), STRETCH-3 (AC-27 metamerism) — G-7 ✅, independent of the acrylic dataset; now land on the 10° basis.
+- **Unblocked by COLOR-4 but need their own data specifics:** FORWARD-3 (AC-12) needs real measured *mixtures* (G-3/G-4); TUNE-3 (AC-21) the real curated palette (G-3) + DATA-7 wording open.
 - **Still gate-blocked:** DATA-6 (AC-9) on **G-4** + the MPI oil observer (**G-5** — see D-14 risk); DATA-7 (AC-11) on **G-3** attribution wording; G-6 adds AC-17 held-out validation *evidence* (not solver logic).
-- **SIGNOFF-1** waits on COLOR-4, DATA-5/6/7, FORWARD-3, TUNE-3, STRETCH-2/3.
+- **SIGNOFF-1** waits on DATA-5/6/7, FORWARD-3, TUNE-3, STRETCH-2/3.
 
 ## Token usage
 
@@ -312,7 +312,8 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 | PROD-3 | 70fd77ae | 2026-10-19 06:10 EDT | 06:29 | 18m 43s | 18m 43s | claude-opus-4-8 | 182 | 262,778 | 10,970,064 | 66,543 | 11,299,567 | AC-25 A/B engines un-pended & green; 20 A, 0 downgrades; cov 117/117·24/24; fix 0/3; MixingEngine frozen, module PROD done |
 | GATE-DECISION | 53e1b2dc | 2026-10-19 06:36 EDT | 08:02 | 1h 26m | 19m 24s | claude-opus-4-8 | 96 | 154,332 | 6,320,217 | 75,718 | 6,550,363 | G-7 approved (Build STRETCH → STRETCH-2/3 startable); G-9 resolved (adopt 10° observer) — reshapes plan, needs --plan upgrade for a colour re-base + re-grade before DATA-5/FORWARD-3/TUNE-3; DATA-5 attempted, no code (probe 66/78 >0.5 vs 10° Lab under 2° engine) |
 | PLAN-UPGRADE | e85dd26e | 2026-10-19 09:44 EDT | 09:54 | 10m 11s | 10m 11s | claude-opus-4-8 | 54 | 97,814 | 2,730,046 | 28,818 | 2,856,732 | added COLOR-4 (10° observer re-base, G-9) + D-14; re-grade scope set for AC-1 + colour-dependent ACs |
-| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-19 09:54** | **15h 35m** | **8h 48m** |  | **4,270** | **7,064,432** | **243,396,318** | **1,851,699** | **252,316,719** |  |
+| COLOR-4 | 305fd8fc | 2026-10-19 10:04 EDT | 10:34 | 30m 47s | 30m 47s | claude-opus-4-8 | 198 | 306,176 | 14,530,269 | 63,497 | 14,900,140 | 10° observer re-base (G-9/D-14): weights+yBarD65Sum+Lab white (inverse/wet_dry/yardstick); AC-1 ΔE00 0.084; suite green; coverage PASS; 22 A / 0 B; fix 0/3 |
+| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-19 10:34** | **16h 05m** | **9h 19m** |  | **4,468** | **7,370,608** | **257,926,587** | **1,915,196** | **267,216,859** |  |
 
 ## Sign-off
 

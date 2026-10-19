@@ -4,8 +4,8 @@ import 'cmf_d65_weights.dart';
 import 'oklch.dart';
 
 /// Converts a reflectance [spectrum] on the [CanonicalGrid] to a [ColourValue]
-/// under the D65 illuminant and the CIE 1931 2° standard observer (design §2,
-/// §3.5; AC-1).
+/// under the D65 illuminant and the CIE 1964 10° standard observer (design §2,
+/// §3.5; AC-1; G-9/D-14 — the observer the measured paint data publishes under).
 ///
 /// The backend weights the spectrum by the precomputed `x̄·D65`, `ȳ·D65`,
 /// `z̄·D65` vectors ([xBarD65], [yBarD65], [zBarD65]) to tristimulus XYZ,

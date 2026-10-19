@@ -83,7 +83,7 @@ Spectrum forwardReflectance(Map<String, double> mix, PigmentResolver resolve) {
 
 /// The predicted colour of the mixture [mix] (design §6.1): the measured
 /// reflectance from [forwardReflectance] converted to a [ColourValue] under D65
-/// / CIE 1931 by [spectrumToColour].
+/// / CIE 1964 10° by [spectrumToColour].
 ColourValue forwardColour(Map<String, double> mix, PigmentResolver resolve) =>
     spectrumToColour(forwardReflectance(mix, resolve));
 

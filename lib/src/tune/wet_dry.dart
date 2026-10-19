@@ -23,9 +23,10 @@ import '../types/recipe.dart';
 /// rebuilds a consistent sRGB/XYZ/OKLCh triple exactly as the colour backend
 /// does (shared maths in `oklch.dart`, no duplicated matrices).
 
-/// CIE standard illuminant D65, 2° observer, reference white (Y normalized to 1)
-/// — the same white the colour backend and the solver's ΔE00 maths use.
-const Xyz _d65White = (x: 0.95047, y: 1.0, z: 1.08883);
+/// CIE standard illuminant D65, 10° observer, reference white (Y normalized to
+/// 1) — the same white the colour backend and the solver's ΔE00 maths use
+/// (kept in lock-step with `inverse.dart`'s `_d65White`; G-9/D-14).
+const Xyz _d65White = (x: 0.94811, y: 1.0, z: 1.07304);
 
 /// Re-renders [recipe] in its dry state by applying the medium's drying
 /// [transform] to its predicted colour. Every other field — the fitted parts,
