@@ -128,6 +128,24 @@ void main() {
       expect(recipes.length, lessThanOrEqualTo(3));
       expect(sw.elapsed, lessThanOrEqualTo(const Duration(seconds: 2)),
           reason: 'a ~15-paint top-3 solve must return within ~1–2 s (SI NFR)');
+
+      // AUGMENTATION (SOLVER-7): the budget must hold even when the caller asks
+      // for more paints per recipe. The subset search is combinatorial in
+      // maxPaints, so without SOLVER-7's performance guard a maxPaints=8 solve
+      // over ~15 paints enumerates tens of thousands of subsets and runs for
+      // many seconds (≈8.7 s measured before the guard; already ≈2.6 s at
+      // maxPaints=5). The guard caps the effective per-recipe paint count so the
+      // search stays within the budget. This rejects an uncapped exponential
+      // search — a reject the in-budget default-maxPaints solve cannot make.
+      const greedy = MixOptions(topK: 3, maxPaints: 8);
+      final swGreedy = Stopwatch()..start();
+      final greedyRecipes = engine.inverse(target, palette, greedy);
+      swGreedy.stop();
+      expect(greedyRecipes, isNotEmpty);
+      expect(greedyRecipes.length, lessThanOrEqualTo(3));
+      expect(swGreedy.elapsed, lessThanOrEqualTo(const Duration(seconds: 2)),
+          reason: 'the performance guard must keep even a high-maxPaints solve '
+              'within the budget (rejects an uncapped exponential search)');
     }, skip: ac('AC-20'));
   });
 

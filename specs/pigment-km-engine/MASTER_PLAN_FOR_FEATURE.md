@@ -1,7 +1,7 @@
 # Master Plan — pigment_km: measured-pigment Kubelka–Munk mixing engine
 
 **Spec:** [pigment-km-engine.feature](../pigment-km-engine.feature)
-**Status:** In progress — SOLVER-6 ✅ 2026-10-18 (AC-17 un-pended, green; per-subset coarse-grid + successive refinement; 15 A re-grade, 0 fixes, cov 143/143; stale FORWARD-3 dep reconciled → DATA-8 enabler; 15 ACs un-pended / 12 pending). Next startable: SOLVER-7 (AC-20, exclusive lane), TUNE-2/TUNE-4/PROD-2/PROD-3.
+**Status:** In progress — SOLVER-7 ✅ 2026-10-18 (AC-20 un-pended, green; **SOLVER module complete**; adaptive `maxPaints` cap + bit-identical per-subset precompute; 16 A re-grade, 0 fixes, cov forward 65/65·inverse 146/146; 16 ACs un-pended / 11 pending). Next startable: TUNE-2/TUNE-4/PROD-2/PROD-3.
 **Architecture:** [Nuance/docs/custom-mixing-engine-design.md](../../../Nuance/docs/custom-mixing-engine-design.md) (physics §3, datasets §4, forward/inverse §6, tuning §7, staged plan §8, licensing §13) · [Nuance/docs/paint-color-app-solution-intent.md](../../../Nuance/docs/paint-color-app-solution-intent.md) (D3/D6/D7/D9, accuracy NFRs) · consumption contract: `Nuance/lib/recipes/engine/mixing_engine.dart` (bs-04)
 **Code home:** `/Users/matthew.quirk/pigment_km` · remote `https://github.com/meatsquirk/pigment-km` (origin, pushed) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
 
@@ -74,7 +74,7 @@ Greenfield — nothing exists yet; every AC is net-new. The gap is the whole lib
 | AC-17 | An in-gamut target is matched within the recipe accuracy target | ITEST-3 `TestAC17_InGamut` | SOLVER-6 (coarse grid + successive refinement) | ✅ |
 | AC-18 | An out-of-gamut target is flagged, never faked | ITEST-3 `TestAC18_OutOfGamut` | SOLVER-4 | ✅ |
 | AC-19 | A single recipe never spans media | ITEST-4 `TestAC19_CrossMedium` | SOLVER-5 | ✅ |
-| AC-20 | The solver returns within the performance budget | ITEST-4 `TestAC20_Performance` | SOLVER-7 | ⬜ Todo |
+| AC-20 | The solver returns within the performance budget | ITEST-4 `TestAC20_Performance` | SOLVER-7 | ✅ |
 | AC-21 | The curated default palette cannot produce neon mixes | ITEST-4 `TestAC21_NoNeon` | TUNE-3 | ⬜ Todo |
 | AC-22 | The chroma penalty breaks ΔE00 ties toward the more muted recipe | ITEST-4 `TestAC22_ChromaPenalty` | TUNE-2 | ⬜ Todo |
 | AC-23 | The wet/dry toggle shifts the prediction by the documented offset | ITEST-4 `TestAC23_WetDry` | TUNE-4 | ⬜ Todo |
@@ -164,7 +164,7 @@ Pre-seeded augmentations: AC-7/AC-11/AC-21 strengthened by DATA-5/DATA-7/TUNE-3 
 | KM | [modules/KM.md](modules/KM.md) | KM reflectance, Saunderson, two-constant mixing, concentration | CORE | ✅ Done (KM-2/3/4) |
 | DATA | [modules/DATA.md](modules/DATA.md) | Pigment data model, ingest, resample, NNLS/masstone-tint, build artifact, attribution | CORE, COLOR, KM | 🔄 In progress (DATA-1 ✅, DATA-8 ✅) |
 | FORWARD | [modules/FORWARD.md](modules/FORWARD.md) | `forward()` engine over measured pigments | COLOR, KM, DATA | 🔄 In progress (FORWARD-2 ✅) |
-| SOLVER | [modules/SOLVER.md](modules/SOLVER.md) | `inverse()` palette-constrained solver | FORWARD | 🔄 In progress (SOLVER-5 ✅) |
+| SOLVER | [modules/SOLVER.md](modules/SOLVER.md) | `inverse()` palette-constrained solver | FORWARD | ✅ Done (SOLVER-2..7) |
 | TUNE | [modules/TUNE.md](modules/TUNE.md) | Natural-colour tuning: curated palette, chromaPenalty, wet/dry | SOLVER, DATA | ⬜ Todo |
 | PROD | [modules/PROD.md](modules/PROD.md) | Provenance wiring, baseline engine + A/B, interface freeze | SOLVER | ⬜ Todo |
 | STRETCH | [modules/STRETCH.md](modules/STRETCH.md) | Finite-layer glazing, metamerism (optional, G-7) | FORWARD, COLOR | ⬜ Todo |
@@ -246,8 +246,8 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 | 26 | SOLVER-5 | AC-19 cross-medium | ✅ Done | 7.94M | 13m 46s | AC-19 un-pended & green; per-medium partition + pooled ranking; control proves each medium searched; 10 A; fix 0/3 |
 | 27 | DATA-8 | enabler: fix synthetic fixture hue faithfulness (G-8) + re-verify/re-grade whole suite | ✅ Done | 7.65M | 15m 08s | inverted `_chroma` K (reflects at hue); blue/red/oil hues faithful; assets regen (parity ✅); suite 136 green + run-pending red baseline; cov 32/32; AC-18 oog holds (ΔE00 32.40); AC-17 reachable ΔE00 3.69; re-grade 10 A; SOLVER-6 dep drift flagged |
 | 28 | SOLVER-6 | AC-17 in-gamut ≤5 | ✅ Done | 10.67M | 18m 12s | AC-17 un-pended, green; coarse grid + successive refinement (3 rounds ×4, Σ=1 shares in (0,1)); reachable near-pure tint 6.4→0.05 ΔE00; stale FORWARD-3 dep reconciled → DATA-8 enabler; cov 143/143; 15 A re-grade; fix 0/3; validation ↔ G-6 |
-| 29 | SOLVER-7 | AC-20 performance | ⬜ Next | | | exclusive lane; refinement adds bounded per-subset evals — precompute weights + cap maxPaints |
-| 30 | TUNE-2 | AC-22 chromaPenalty | ⬜ Todo | | | |
+| 29 | SOLVER-7 | AC-20 performance | ✅ Done | 11.78M | 24m 11s | AC-20 un-pended & green; adaptive `maxPaints` cap (subset-count budget) + bit-identical per-subset precompute (`BoundForward`); maxPaints 5/6/8 on 15 paints 2.6/8.7/8.7s→~0.31s; exclusive-lane AC-20 green; test augmented (maxPaints=8 rejects uncapped exponential); cov forward 65/65·inverse 146/146; 16 A re-grade; fix 0/3; SOLVER module ✅ |
+| 30 | TUNE-2 | AC-22 chromaPenalty | ⬜ Next | | | |
 | 31 | TUNE-3 | AC-21 curated palette | ⬜ Todo | | | real palette ↔ G-3 |
 | 32 | TUNE-4 | AC-23 wet/dry | ⬜ Todo | | | |
 | 33 | PROD-2 | AC-24 provenance | ⬜ Todo | | | |
@@ -260,11 +260,11 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 
 ## Next phase
 
-**SOLVER-6 ✅ (2026-10-18): AC-17 in-gamut accuracy un-pended, green.** `_bestRecipeForSubset` now fits each palette-subset in two stages — the coarse 1/12 simplex grid locates the basin, then successive refinement (3 rounds, step ×4: 1/12→1/768) hill-climbs by shifting volume between two paints while keeping Σ=1 and every share in (0,1). A reachable near-pure tint the coarse grid alone misses by ≈6.4 ΔE00 (> the ≤5 ceiling) now solves to ≈0.05; ranking/out-of-gamut/medium-partition untouched. Stale FORWARD-3 dependency reconciled → DATA-8 recorded as the enabler (AC-17 is a synthetic-target test, not real-palette forward fidelity). Grade gate: fresh adversarial re-grade of all 15 un-pended ACs → **15 A, 0 B, 0 fixes**; cov 143/143. 15 un-pended / 12 pending.
+**SOLVER-7 ✅ (2026-10-18): AC-20 performance budget un-pended, green — SOLVER module complete.** Two `lib/src/engine` changes: (1) `_effectiveMaxPaints` in `inverse.dart` caps the per-recipe paint count via a cumulative-subset budget (`_subsetBudget=2500`), bounding the combinatorial search on a large palette while returning the caller's full `maxPaints` on a small one; transparent to every other AC (all ≤3-paint palettes or default `maxPaints=4` → same value as the old `min`). (2) `BoundForward` in `forward.dart` precomputes each subset's paint K/S + medium config once and evaluates share vectors reusing buffers — **bit-identical** to `forwardColour` (exact-equality unit test), so no AC's results change. A 15-paint top-3 solve ≈0.31s (default dropped 480→337ms); `maxPaints=5/6/8` 2.6/8.7/8.7s→~0.31s. AC-20 test augmented (strengthen-only) with a `maxPaints=8` solve that rejects an uncapped exponential search. Grade gate: fresh adversarial re-grade of all 16 un-pended ACs → **16 A, 0 B, 0 fixes**; cov forward 65/65·inverse 146/146. 16 un-pended / 11 pending.
 
-**Next, startable now:**
-- **SOLVER-7** (AC-20 performance, `inverse.dart`, exclusive lane) ⬜ Next — time top-3 over ~15 paints ≤ ~2 s; the refinement adds bounded per-subset evals, so precompute per-paint weights and cap `maxPaints`. Merge-risky with any other `lib/src/engine/*` phase.
-- Also startable (no gate): **TUNE-2** (AC-22 chromaPenalty), **TUNE-4** (AC-23 wet/dry), **PROD-2** (AC-24 provenance), **PROD-3** (AC-25 A/B engines). SOLVER-7 and PROD-3 both touch `lib/src/engine/*` → mutually merge-risky; TUNE-2/4 and PROD-2 may be more disjoint (confirm file ownership per the module plans).
+**Next, startable now (no gate):**
+- **TUNE-2** (AC-22 chromaPenalty, `inverse.dart` ranking) ⬜ Next — chroma-penalty tie-break toward the more muted recipe; the tie uses differing-chroma recipes (its own, not SOLVER-3's equal-ΔE00 twin tie).
+- Also startable: **TUNE-4** (AC-23 wet/dry, post-prediction transform), **PROD-2** (AC-24 provenance), **PROD-3** (AC-25 A/B engines). TUNE-2 and PROD-3 both touch `lib/src/engine/*` → mutually merge-risky; TUNE-4 (likely a post-prediction state toggle) and PROD-2 may be more disjoint (confirm file ownership per the module plans before running in parallel).
 - **Gate-blocked:** DATA-5 (AC-7)/DATA-7 (AC-11)/TUNE-3 (AC-21) on G-3; DATA-6 (AC-9) on G-4; FORWARD-3 (AC-12) on G-3/G-4; STRETCH-2/3 on G-7.
 
 Dataset gates G-3/G-4/G-5 block the fidelity/real-palette ACs (AC-7/9/11/12/21); G-6 adds AC-17 held-out validation *evidence* (not the solver logic); G-7 gates STRETCH. Routing (G-2): AC-23 = post-prediction state transform (TUNE-4).
@@ -303,7 +303,8 @@ Dataset gates G-3/G-4/G-5 block the fidelity/real-palette ACs (AC-7/9/11/12/21);
 | DATA-3 | 6b7aac0b | 2026-10-18 15:07 EDT | 15:18 | 11m 08s | 11m 08s | claude-opus-4-8 | 118 | 202,672 | 5,816,522 | 37,877 | 6,057,189 | AC-6 un-pended green; load decodes shipped asset (single source), memoised; cov 12/12; 13 A re-grade, 0 fixes |
 | DATA-4 | 43cd7aba | 2026-10-18 15:40 EDT | 15:51 | 11m 24s | 11m 24s | claude-opus-4-8 | 104 | 189,309 | 5,178,278 | 37,927 | 5,405,618 | AC-10 un-pended green; per-λ 2×2 least-squares masstone–tint K,S derivation; backends_stub_test deleted; analyze clean, default 156/13, run-pending baseline correct, cov 34/34 PASS; 14 A re-grade, 0 fixes |
 | SOLVER-6 | 06d76f91 | 2026-10-18 15:57 EDT | 16:15 | 18m 12s | 18m 12s | claude-opus-4-8 | 184 | 220,850 | 10,384,588 | 62,283 | 10,667,905 | AC-17 un-pended & green; coarse grid + successive refinement; 15 A re-grade; cov 143/143; fix 0/3 |
-| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-18 16:15** | **12h 15m** | **6h 36m** |  | **3,302** | **5,522,078** | **182,078,084** | **1,380,471** | **188,983,935** |  |
+| SOLVER-7 | a7c22cfd | 2026-10-18 20:19 EDT | 20:43 | 24m 11s | 24m 11s | claude-opus-4-8 | 176 | 252,185 | 11,434,831 | 91,063 | 11,778,255 | AC-20 un-pended & green; SOLVER module complete; 16 A re-grade; cov forward 65/65 inverse 146/146; fix 0/3 |
+| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-18 20:43** | **12h 39m** | **7h 00m** |  | **3,478** | **5,774,263** | **193,512,915** | **1,471,534** | **200,762,190** |  |
 
 ## Sign-off
 

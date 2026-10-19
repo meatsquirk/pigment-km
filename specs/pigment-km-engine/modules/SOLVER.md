@@ -1,6 +1,6 @@
 # Module SOLVER — the inverse solver
 
-**Status:** In progress — SOLVER-6 ✅ (per-subset successive refinement; AC-17 ✅ in-gamut ≤5); next SOLVER-7 (AC-20 performance, exclusive lane)
+**Status:** ✅ Done — SOLVER-7 ✅ (AC-20 performance budget: adaptive `maxPaints` cap + per-subset precompute); all 6 SOLVER phases done; AC-15/16/17/18/19/20 ✅
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/engine/inverse.dart` (subset enumeration, per-subset optimizer, ranking, out-of-gamut, medium partition), `lib/src/engine/custom_km_engine.dart` (`inverse`)
 **Depends on:** FORWARD · **Blocks:** TUNE, PROD
@@ -14,7 +14,7 @@
 | 4 (SOLVER-4) | behavior | AC-18 | ✅ Done | 8.64M | 16m 37s (17m 34s) |
 | 5 (SOLVER-5) | behavior | AC-19 | ✅ Done | 7.94M | 13m 46s |
 | 6 (SOLVER-6) | behavior | AC-17 | ✅ Done | 10.67M | 18m 12s |
-| 7 (SOLVER-7) | behavior | AC-20 | ⬜ Next (exclusive lane) | | |
+| 7 (SOLVER-7) | behavior | AC-20 | ✅ Done | 11.78M | 24m 11s |
 
 ## Interface reconciliation
 
@@ -356,4 +356,63 @@ unreachable target (pure green) still can't be reached and stays flagged.
 - **Exit criteria:** analyze clean; 100% touched; timed run in the **exclusive lane** meets the budget.
 - **Acceptance gate:** un-pend AC-20; `TestAC20_Performance` green (exclusive lane).
 
-### Result · Checkpoint  <!-- filled on completion -->
+### Result · Checkpoint
+
+**Result (SOLVER-7 · AC-20).** The performance budget is now a guarantee, not an
+accident of the default. Two changes to `lib/src/engine`:
+- **Adaptive per-recipe cap** (`inverse.dart`). `_effectiveMaxPaints(groupSize,
+  requested)` replaces the old `math.min(opts.maxPaints, group.length)`: it builds
+  `C(groupSize, k)` incrementally and lowers the effective cap until the
+  cumulative subset count fits `_subsetBudget` (2500). On a large palette this
+  bounds the combinatorial search; on a small one it returns the caller's full
+  `maxPaints` unchanged. It is transparent to every other AC — all use ≤ 3-paint
+  palettes or default `maxPaints=4`, and `_effectiveMaxPaints(3,4)=3`,
+  `_effectiveMaxPaints(15,4)=4` equal the old `min`, so AC-15/16/17/18/19
+  enumerate identical subsets and their ranked recipes are byte-unchanged.
+- **Per-subset precompute** (`forward.dart` `BoundForward`). The subset's paint
+  K/S spectra and the medium Saunderson config are read + length-checked **once**;
+  `colourFor(shares)` then predicts each grid/refinement point reusing internal
+  buffers instead of re-resolving ids, rebuilding the component list and
+  re-validating per call. It reproduces `forwardColour` **bit-for-bit** (pinned by
+  an exact-equality unit test across every subset size), so it is a pure
+  optimization — no AC's observable behaviour changes. `_bestRecipeForSubset` lost
+  its `resolve` param (the subset carries the pigments directly); the id→pigment
+  map in `solvePaletteConstrained` is gone.
+- **Measured (exclusive lane + direct):** a 15-paint top-3 solve ≈ 0.31 s (default
+  `maxPaints=4` dropped 480 → 337 ms from the precompute); `maxPaints=5/6/8` on 15
+  paints went from **2594 / 8708 / 8708 ms → ≈ 310 ms** (the cap). Best ΔE00
+  identical to pre-phase, so the cap bounds work, not results.
+- **Acceptance:** AC-20 un-pended (row deleted from `pending.dart`; added to
+  `unpendedACs` → SOLVER-7). `TestAC20_Performance` **augmented** (strengthen-only,
+  G6-safe) with a `maxPaints=8` solve that must also finish ≤ 2 s — it FAILS the
+  pre-phase uncapped search (≈ 8.7 s; already 2.6 s at `maxPaints=5`) and PASSES
+  the capped one, so the budget assertion now rejects an uncapped exponential
+  search (the default-maxPaints solve alone could not).
+- **Verification:** `dart analyze` → No issues · `dart test` → **166 passed / 11
+  skipped** (AC-20 skip→pass + 5 new SOLVER-7 unit tests) · acceptance default
+  `dart test test/acceptance` → **24 passed / 11 skipped** · AC-20 green in the
+  exclusive lane (`coord.sh with-lock`) · coverage gate (vs BASE `7991fe4`) →
+  **PASS** (`forward.dart` 65/65, `inverse.dart` 146/146). Line-only metric (CORE
+  deviation) as before; every branch of `_effectiveMaxPaints` (break / run-to-limit)
+  and `BoundForward` (empty + cross-medium guards) exercised by unit tests.
+- **Grade gate:** fresh independent adversarial grader (G1–G6), given the prior
+  grid → **16 A, 0 B, 0 fixes** (AC-20 A; AC-1..6,8,10,13,14,15,16,17,18,19
+  re-confirmed — diff is only `inverse.dart`+`forward.dart`, the precompute is
+  bit-identical and the cap transparent). Grid: *Behaviour re-grade — SOLVER-7*.
+- **Augmentations:** TestAC20 closed (above). None newly enabled for other ACs.
+- **Fix passes:** 0/3 (passed first run). **Tokens / time:** see dashboard.
+
+**Checkpoint / Handoff.**
+- **Frozen interface (unchanged surface):** `CustomKmEngine.inverse` →
+  `solvePaletteConstrained`, same signature and exports. `_effectiveMaxPaints`,
+  `_subsetBudget` are private to `inverse.dart`; `BoundForward` is internal to
+  `forward.dart` (not exported from the barrel) — a solver-only perf helper.
+- **Verification commands (reuse):** `export PATH="$HOME/development/flutter/bin:$PATH"`
+  first. `dart analyze`; `dart test`; coverage `bash tool/coverage_gate.sh <BASE>`;
+  acceptance default `dart test test/acceptance`; AC-20 timing in the exclusive
+  lane via `coord.sh with-lock pigment-km-engine <PHASE> -- …`.
+- **SOLVER module complete** (all 6 phases done; AC-15/16/17/18/19/20 ✅). PROD-2
+  (AC-24 provenance) and PROD-3 (AC-25 A/B engines) build on `inverse`. Note:
+  `_subsetBudget` (2500) is an empirical proxy calibrated at the 15-paint / 4-per-
+  recipe point and validated by AC-20 in the exclusive lane — re-check it if the
+  per-subset refinement cost changes materially.

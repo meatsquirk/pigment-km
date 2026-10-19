@@ -40,8 +40,6 @@ List<Recipe> solvePaletteConstrained(
   if (palette.isEmpty) {
     return const <Recipe>[];
   }
-  final byId = <String, Pigment>{for (final p in palette) p.id: p};
-  Pigment resolve(String id) => byId[id]!;
 
   // AC-19 / design §4.3 — the cross-medium hard constraint. A single recipe may
   // never span media, so the palette is partitioned by [Medium] and each
@@ -61,10 +59,12 @@ List<Recipe> solvePaletteConstrained(
 
   final candidates = <Recipe>[];
   byMedium.forEach((medium, group) {
-    final maxK = math.min(opts.maxPaints, group.length);
+    // SOLVER-7 (AC-20): the per-recipe paint count is capped so the subset
+    // search stays within the performance budget even on a large palette.
+    final maxK = _effectiveMaxPaints(group.length, opts.maxPaints);
     for (var k = 1; k <= maxK; k++) {
       for (final subset in _subsetsOfSize(group, k)) {
-        candidates.add(_bestRecipeForSubset(subset, target, medium, resolve));
+        candidates.add(_bestRecipeForSubset(subset, target, medium));
       }
     }
   });
@@ -125,6 +125,40 @@ int _byDeltaThenFewerPaints(Recipe a, Recipe b) {
   return a.parts.length.compareTo(b.parts.length);
 }
 
+/// SOLVER-7 (AC-20) — the performance guard. The subset search is combinatorial
+/// in the number of paints allowed per recipe, so on a large palette the
+/// effective per-recipe cap is lowered until the number of subsets enumerated
+/// fits this budget; this keeps a ~15-paint top-3 solve within the SI budget
+/// (~1–2 s) while leaving a small palette free to use the caller's full
+/// [MixOptions.maxPaints]. It is an empirically-calibrated proxy for the solve
+/// cost: at 1940 subsets (15 paints, ≤ 4 per recipe) the solve measures well
+/// under the ceiling, while the next step up (4943 subsets, ≤ 5 per recipe)
+/// overruns it — validated in the exclusive lane.
+const int _subsetBudget = 2500;
+
+/// The largest per-recipe paint count in `1 … [requested]` whose cumulative
+/// subset count over a [groupSize]-paint medium group stays within
+/// [_subsetBudget]. The binomial `C(groupSize, k)` is built incrementally and
+/// the loop stops as soon as adding the size-`k` subsets would exceed the
+/// budget, so it neither overflows nor over-counts. Returns at least 1 for any
+/// non-empty group with [requested] ≥ 1 (a single-paint recipe is never over
+/// budget for a realistic palette), so the solver always has candidates.
+int _effectiveMaxPaints(int groupSize, int requested) {
+  final limit = math.min(requested, groupSize);
+  var subsets = 0;
+  var choose = 1; // C(groupSize, 0)
+  var maxK = 0;
+  for (var k = 1; k <= limit; k++) {
+    choose = choose * (groupSize - k + 1) ~/ k; // C(groupSize, k)
+    if (subsets + choose > _subsetBudget) {
+      break;
+    }
+    subsets += choose;
+    maxK = k;
+  }
+  return maxK;
+}
+
 /// The coarse volume-fraction grid resolution: each paint's share starts as a
 /// multiple of `1 / _gridSteps`. This grid only *locates* the basin; SOLVER-6's
 /// successive refinement (below) then tightens the fit.
@@ -155,16 +189,17 @@ Recipe _bestRecipeForSubset(
   List<Pigment> subset,
   ColourValue target,
   Medium medium,
-  PigmentResolver resolve,
 ) {
   final ids = <String>[for (final p in subset) p.id];
   final n = ids.length;
 
+  // SOLVER-7 — precompute the subset's paint spectra and medium config once, so
+  // the hundreds of grid + refinement evaluations below reuse them (and the
+  // accumulation buffers) instead of re-resolving and re-validating per call.
+  final forward = BoundForward(subset);
+
   ({double delta, ColourValue colour}) evaluate(List<double> shares) {
-    final parts = <String, double>{
-      for (var i = 0; i < n; i++) ids[i]: shares[i],
-    };
-    final colour = forwardColour(parts, resolve);
+    final colour = forward.colourFor(shares);
     return (delta: deltaE2000Xyz(colour.xyz, target.xyz), colour: colour);
   }
 

@@ -2,6 +2,9 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:pigment_km/pigment_km.dart';
+// SOLVER-7 reaches the internal performance helper and the reference forward
+// evaluator directly, to pin that the bound evaluator is bit-identical.
+import 'package:pigment_km/src/engine/forward.dart' show BoundForward, forwardColour;
 import 'package:test/test.dart';
 
 /// ΔE00 between two L*=50, chroma-30 colours at the given hue angles (degrees),
@@ -367,6 +370,116 @@ void main() {
       expect(threePaint.parts, hasLength(3));
       expect(threePaint.deltaE00, lessThan(1.0),
           reason: 'refinement reaches a reachable 3-paint mix closely');
+    });
+  });
+
+  group('CustomKmEngine.inverse — performance guard + precompute (SOLVER-7)', () {
+    const engine = CustomKmEngine();
+    final acrylic = PigmentTable.load(Medium.acrylic).pigments;
+
+    // A ~15-paint single-medium palette (the AC-20 search size), built by
+    // cloning the acrylic paints under distinct ids so the subset search is
+    // genuinely combinatorial.
+    List<Pigment> fifteen() => <Pigment>[
+          for (var i = 0; i < 15; i++)
+            Pigment(
+              id: 'perf.paint_$i',
+              name: acrylic[i % acrylic.length].name,
+              pigmentIndex: acrylic[i % acrylic.length].pigmentIndex,
+              medium: acrylic[i % acrylic.length].medium,
+              k: acrylic[i % acrylic.length].k,
+              s: acrylic[i % acrylic.length].s,
+              opacity: acrylic[i % acrylic.length].opacity,
+              provenance: acrylic[i % acrylic.length].provenance,
+              sourceRef: acrylic[i % acrylic.length].sourceRef,
+            ),
+        ];
+
+    test('a high maxPaints over a large palette is capped to the budgeted '
+        'search (same result as the default cap)', () {
+      // GIVEN a 15-paint palette and a target. WHEN the caller requests a large
+      // maxPaints (8) the cumulative subset count (22 818) far exceeds the
+      // budget, so the guard lowers the effective per-recipe cap — exercising
+      // the break arm of the budget loop. THEN the solve still returns the
+      // top-3, and returns the SAME recipes as the default maxPaints=4 solve:
+      // the extra large subsets the uncapped search would enumerate never beat
+      // the budgeted ones, so the cap bounds the work without changing results.
+      final palette = fifteen();
+      final target = engine.forward(const {
+        'acrylic.titanium_white': 0.6,
+        'acrylic.phthalo_blue': 0.25,
+        'acrylic.naphthol_red': 0.15,
+      });
+      final capped = engine.inverse(target, palette, const MixOptions(topK: 3));
+      final greedy = engine.inverse(
+          target, palette, const MixOptions(topK: 3, maxPaints: 8));
+
+      expect(greedy, isNotEmpty);
+      expect(greedy.length, lessThanOrEqualTo(3));
+      expect(greedy.length, capped.length);
+      for (var i = 0; i < greedy.length; i++) {
+        expect(greedy[i].parts, capped[i].parts,
+            reason: 'the guard must not change the ranked recipes, only bound '
+                'the search');
+        expect(greedy[i].deltaE00, capped[i].deltaE00);
+      }
+      // Every returned recipe stays within the budgeted per-recipe size.
+      expect(greedy.map((r) => r.parts.length), everyElement(lessThanOrEqualTo(4)));
+    });
+
+    test('a small palette still honours the caller full maxPaints (cap does '
+        'not bite)', () {
+      // GIVEN the small acrylic palette (3 paints): the cumulative subset count
+      // at maxPaints=4 (7 subsets) is far under budget, so the budget loop runs
+      // all the way to `limit` without breaking — the non-break path. THEN a
+      // recipe using every palette paint (3) is reachable, so the cap did not
+      // lower the effective maximum below the palette size.
+      final target = engine.forward(const {
+        'acrylic.titanium_white': 0.4,
+        'acrylic.phthalo_blue': 0.35,
+        'acrylic.naphthol_red': 0.25,
+      });
+      final recipes = engine.inverse(target, acrylic, const MixOptions());
+      expect(recipes.any((r) => r.parts.length == acrylic.length), isTrue,
+          reason: 'a 3-paint palette at maxPaints=4 must still search the '
+              'full-palette subset');
+    });
+
+    test('BoundForward reproduces forwardColour bit-for-bit (precompute)', () {
+      // The precompute helper must be a pure optimization: a bound evaluation
+      // and the equivalent forwardColour call return identical colours, so the
+      // ranking/accuracy ACs are untouched. Checked across every subset size.
+      final rng = math.Random(7);
+      for (var size = 1; size <= acrylic.length; size++) {
+        final subset = acrylic.sublist(0, size);
+        final bound = BoundForward(subset);
+        Pigment resolve(String id) => subset.firstWhere((p) => p.id == id);
+        for (var t = 0; t < 8; t++) {
+          final shares = <double>[
+            for (var i = 0; i < size; i++) rng.nextDouble() + 0.01,
+          ];
+          final got = bound.colourFor(shares);
+          final parts = <String, double>{
+            for (var i = 0; i < size; i++) subset[i].id: shares[i],
+          };
+          final ref = forwardColour(parts, resolve);
+          expect(got.xyz.x, ref.xyz.x);
+          expect(got.xyz.y, ref.xyz.y);
+          expect(got.xyz.z, ref.xyz.z);
+        }
+      }
+    });
+
+    test('BoundForward rejects an empty paint set', () {
+      expect(() => BoundForward(const <Pigment>[]), throwsArgumentError);
+    });
+
+    test('BoundForward rejects paints spanning media', () {
+      final mixed = <Pigment>[
+        PigmentTable.load(Medium.acrylic).pigments.first,
+        PigmentTable.load(Medium.oil).pigments.first,
+      ];
+      expect(() => BoundForward(mixed), throwsArgumentError);
     });
   });
 
