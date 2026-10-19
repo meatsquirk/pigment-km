@@ -1,6 +1,6 @@
 # Module DATA — datasets, ingestion, build artifact, attribution
 
-**Status:** In progress — DATA-1 ✅; DATA-8 ✅ (fixture hue-faithful, G-8); DATA-2 ✅ (AC-8 resampler); DATA-3 ✅ (AC-6 load decodes the shipped asset); DATA-4 ✅ (AC-10 masstone–tint least-squares, 2026-10-18 — 14 A re-grade, 0 fixes, cov 34/34). Next DATA-5/6/7, all gated on G-3/G-4
+**Status:** In progress — DATA-1 ✅; DATA-8 ✅ (fixture hue-faithful, G-8); DATA-2 ✅ (AC-8 resampler); DATA-3 ✅ (AC-6 load decodes the shipped asset); DATA-4 ✅ (AC-10 masstone–tint least-squares, 2026-10-18 — 14 A re-grade, 0 fixes, cov 34/34). DATA-5 data in hand but **blocked by observer mismatch (G-9)**; DATA-6 on G-4, DATA-7 on G-3 attribution wording
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/data/pigment_table.dart` (loader), `lib/src/data/artifact_format.dart`, `lib/src/data/resample.dart`, `lib/src/data/masstone_tint.dart`, `lib/src/data/nnls_fit.dart`, `lib/src/data/synthetic_fixture.dart`, `assets/pigments/*` (shipped build artifacts, medium-tagged), `NOTICE`/`ATTRIBUTION.md`, `tool/ingest/*` (offline ingest scripts, not shipped at runtime)
 **Depends on:** CORE, COLOR, KM · **Blocks:** FORWARD-3, SOLVER (real palette), TUNE-3; **DATA-8 blocks SOLVER-6** (the fixture must render faithful hues before AC-17's in-gamut target is reachable)
@@ -13,7 +13,7 @@
 | 2 (DATA-2) | behavior | AC-8 | ✅ Done | 5.22M | 11m 07s |
 | 3 (DATA-3) | behavior | AC-6 | ✅ Done | 6.06M | 11m 08s |
 | 4 (DATA-4) | behavior | AC-10 | ✅ Done | 5.41M | 11m 24s |
-| 5 (DATA-5) | behavior | AC-7 | ⬜ Todo (G-3) | | |
+| 5 (DATA-5) | behavior | AC-7 | ⬜ Todo — data in; **blocked by observer mismatch (G-9)** | | |
 | 6 (DATA-6) | behavior | AC-9 | ⬜ Todo (G-4) | | |
 | 7 (DATA-7) | behavior | AC-11 | ⬜ Todo (G-3) | | |
 | 8 (DATA-8) | enabler | — | ✅ Done | — | — |
@@ -24,7 +24,8 @@ Build-time ingest (design §4, SI D6) produces a compact medium-tagged artifact 
 
 ## Open gates
 
-- **G-3** (dependency): the Golden/RIT acrylic data + its fields/k1,k2/attribution wording → blocks DATA-5, DATA-7. **Permission letter obtained 2026-10-17** (owner holds written permission from Berns/RIT) → redistribution cleared; DATA-7 must honour the letter's required attribution wording. Still open: grid/units/`k1,k2` from the dataset README, and whether IS&T paper-copyright wording is also required.
+- **G-3** (dependency): the Golden/RIT acrylic data + its fields/k1,k2/attribution wording → blocks DATA-5, DATA-7. **Permission letter obtained 2026-10-17** (owner holds written permission from Berns/RIT) → redistribution cleared; DATA-7 must honour the letter's required attribution wording. **Data in hand + fields confirmed 2026-10-19** (`tool/ingest/raw/rit/GoldenSpectra.zip` → "Reflectance Data for Golden HB 10 mil Drawdowns over White.xlsx", 78 paints, one sheet): columns = Prod #, Name, published **L\*a\*b\* (D65/10°)**, **% Reflectance**, **K/S**, all on **400–700 nm @ 10 nm = the canonical 31-bin grid** (no resample needed). S-normalization = turnkey K/S column (store `S≡1`, `K = K/S`). Still open: DATA-7 attribution wording (incl. whether IS&T paper-copyright wording is required).
+- **G-9** (decision, surfaced DATA-5 2026-10-19): the dataset's published colours are **D65/10°** but the engine colour pipeline is **CIE 1931 2°** (frozen, AC-1). AC-7's ≤ 0.5 round-trip to the published Lab is **unachievable**: probe over all 78 paints (rendered via the 2° pipeline, from reflectance and from the K/S column — identical) gives ΔE00 **max 6.75, mean 1.91, 66/78 > 0.5**, correlated with chroma (neutrals ≈ 0.05–0.11; Titan Buff C\*15 → 1.24; saturated blues/yellows 4–6.7). This is a colorimetry/observer mismatch, not an ingest error — no k1,k2 or grid choice fixes it. **DATA-5 cannot be re-planned until G-9 is decided** (adopt 10° / relax AC-7 / different data / accept gap). Probe + data provenance recorded; no DATA-5 code written.
 - **G-4** (dependency): the MPI oil dataset + mixtures → blocks DATA-6.
 - **G-5** (decision): per-medium k1,k2 + S-normalization (folds into G-3/G-4).
 - **G-8** (decision, ✅ resolved 2026-10-17 — Matt Quirk): the synthetic fixture rendered chromatic paints as the **complement** of their names — `_chroma` peaked each paint's absorption K at its *named* hue's bin, so "phthalo_blue" (peakBin 4 ≈440 nm) absorbs blue and renders orange/tan, "naphthol_red" (peakBin 22 ≈620 nm) renders cyan-ish (oil ultramarine/yellow_ochre likewise). Decision: **fix the fixture to be hue-faithful (DATA-8)**, not retarget AC-17. Blocks DATA-8, SOLVER-6.

@@ -1,7 +1,7 @@
 # Master Plan — pigment_km: measured-pigment Kubelka–Munk mixing engine
 
 **Spec:** [pigment-km-engine.feature](../pigment-km-engine.feature)
-**Status:** In progress — PROD-3 ✅ 2026-10-19 (AC-25 A/B interchangeable engines un-pended, green; single-constant `SpectralBaselineEngine` + `ABHarness`; `MixingEngine` frozen; 20 A re-grade, 0 downgrades; cov 117/117·24/24; 20 ACs un-pended / 7 pending). Module PROD done. No ungated phase remains — everything left is gate-blocked (DATA-5/6/7, FORWARD-3, TUNE-3, STRETCH-2/3) or SIGNOFF-1.
+**Status:** In progress — next **STRETCH-2** or **STRETCH-3** (G-7 resolved 2026-10-19: Build STRETCH; both startable). DATA-5 blocked by the new **G-9** observer mismatch (owner decision needed); DATA-7/TUNE-3/FORWARD-3 on G-3/G-9, DATA-6 on G-4. 20 ACs un-pended / 7 pending.
 **Architecture:** [Nuance/docs/custom-mixing-engine-design.md](../../../Nuance/docs/custom-mixing-engine-design.md) (physics §3, datasets §4, forward/inverse §6, tuning §7, staged plan §8, licensing §13) · [Nuance/docs/paint-color-app-solution-intent.md](../../../Nuance/docs/paint-color-app-solution-intent.md) (D3/D6/D7/D9, accuracy NFRs) · consumption contract: `Nuance/lib/recipes/engine/mixing_engine.dart` (bs-04)
 **Code home:** `/Users/matthew.quirk/pigment_km` · remote `https://github.com/meatsquirk/pigment-km` (origin, pushed) · base `main` · greenfield (new MIT-licensed Dart package) — confirmed by Matt Quirk, 2026-10-15
 
@@ -167,7 +167,7 @@ Pre-seeded augmentations: AC-7/AC-11/AC-21 strengthened by DATA-5/DATA-7/TUNE-3 
 | SOLVER | [modules/SOLVER.md](modules/SOLVER.md) | `inverse()` palette-constrained solver | FORWARD | ✅ Done (SOLVER-2..7) |
 | TUNE | [modules/TUNE.md](modules/TUNE.md) | Natural-colour tuning: curated palette, chromaPenalty, wet/dry | SOLVER, DATA | 🔄 In progress (TUNE-2 ✅, TUNE-4 ✅; TUNE-3 ↔ G-3) |
 | PROD | [modules/PROD.md](modules/PROD.md) | Provenance wiring, baseline engine + A/B, interface freeze | SOLVER | ✅ Done (PROD-2 ✅, PROD-3 ✅) |
-| STRETCH | [modules/STRETCH.md](modules/STRETCH.md) | Finite-layer glazing, metamerism (optional, G-7) | FORWARD, COLOR | ⬜ Todo |
+| STRETCH | [modules/STRETCH.md](modules/STRETCH.md) | Finite-layer glazing, metamerism (G-7 ✅ build) | FORWARD, COLOR | ⬜ Todo — startable (STRETCH-2, STRETCH-3) |
 | ITEST | [modules/ITEST.md](modules/ITEST.md) | Acceptance integration suite: one pending test per AC, and its review | CORE, DATA shells | ✅ Done (ITEST-1..5; G-2 approved 2026-10-16) |
 
 ## Dependency graph
@@ -199,12 +199,13 @@ graph LR
 |---|---|---|---|---|
 | G-1 | decision | Approve the spec (record the approval as its first line) | CORE-1 | ✅ Resolved 2026-10-16: spec approved as-is, recorded as its first line — Matt Quirk |
 | G-2 | decision | Approve the acceptance tests (ITEST-5's packet) | every behavior phase | ✅ Resolved 2026-10-16 11:08 EDT: approved — Matt Quirk. Routing: AC-23 wet/dry = post-prediction state transform (`forward`/`inverse` stay option-free, TUNE-4); AC-5 un-pend moves KM-4 → FORWARD-2 |
-| G-3 | dependency | Obtain + archive the Golden/RIT acrylic K,S data; confirm its exact fields, grid, S-normalization and k1,k2 (design §4 action #2) and the agreed attribution wording with Berns/MCSL (permission granted 2026-10-15) | DATA-5, DATA-7, FORWARD-3, TUNE-3 (real palette) | Open |
+| G-3 | dependency | Obtain + archive the Golden/RIT acrylic K,S data; confirm its exact fields, grid, S-normalization and k1,k2 (design §4 action #2) and the agreed attribution wording with Berns/MCSL (permission granted 2026-10-15) | DATA-5, DATA-7, FORWARD-3, TUNE-3 (real palette) | ⏸ Data in hand 2026-10-19 (tool/ingest/raw/rit/, archived; fields/grid confirmed — see G-9); permission letter held 2026-10-17. Acquisition side satisfied; DATA-5 now blocked by the **observer mismatch — G-9**. DATA-7 attribution wording still to confirm (incl. IS&T paper-copyright). |
 | G-4 | dependency | Obtain the MPI Old Holland oil dataset (CC BY 4.0 — clear) and its mixtures | DATA-6 | Open |
 | G-5 | decision | Confirm per-medium Saunderson k1,k2 + S-normalization from each dataset README | DATA-5, DATA-6 (folds into G-3/G-4 acquisition) | Open |
 | G-6 | dependency | Spectrophotometer availability for held-out ΔE00 validation evidence (SI open decision #3); MPI mixtures give a no-instrument oil path | AC-17 validation confidence (SOLVER-6) | Open |
-| G-7 | decision | Confirm STRETCH (S6 glazing + metamerism) scope before building it | STRETCH-2, STRETCH-3 | Open |
+| G-7 | decision | Confirm STRETCH (S6 glazing + metamerism) scope before building it | STRETCH-2, STRETCH-3 | ✅ Resolved 2026-10-19: **Build STRETCH** — glazing + metamerism confirmed in scope; STRETCH-2/3 startable; SIGNOFF-1 now also waits on STRETCH-2/3 — Matt Quirk |
 | G-8 | decision | Synthetic fixture renders chromatic paints as the complement of their names (absorption K peaked at the named hue) — fix the fixture to be hue-faithful, or retarget AC-17? | DATA-8, SOLVER-6 (AC-17) | ✅ Resolved 2026-10-17: fix the fixture (new DATA-8 enabler); AC-17 keeps a genuinely in-gamut target — Matt Quirk |
+| G-9 | decision | **Observer mismatch (surfaced DATA-5, 2026-10-19).** The Golden/RIT acrylic data is in hand (tool/ingest/raw/rit/, archived), fields/grid confirmed (Name, Prod #, % Reflectance, K/S, **published L\*a\*b\* under D65/10°**, on the 400–700@10 canonical grid — no resample). But the engine's colour pipeline is **CIE 1931 2°** (frozen COLOR, AC-1). Probe over all 78 paints: rendering each paint's measured reflectance (and, identically, its K/S column) through the 2° pipeline and comparing to the dataset's published Lab gives ΔE00 **max 6.75, mean 1.91, 66/78 > 0.5**, correlated with chroma (neutrals ≈ 0.05–0.11; saturated blues/yellows 4–6.7). AC-7 needs ≤ 0.5 for **every** paint — unachievable vs the dataset's 10° Lab with the 2° engine; no k1,k2/grid choice fixes an observer mismatch. **Decide:** (A) adopt a 10° observer for the colour pipeline to match the dataset [re-grade AC-1 + every colour-dependent AC; new COLOR phases]; (B) relax AC-7's threshold [spec change, weakens the AC]; (C) obtain/augment a dataset whose published colours are 2° (or raw spectra to render at 2°); (D) accept DATA-5 with a documented gap / keep AC-7 pending. | DATA-5, and the published-colour fidelity of FORWARD-3/TUNE-3 | Open |
 
 Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 
@@ -262,9 +263,13 @@ Resolved: `✅ Resolved <date time>: <decision, one line> — <who>`.
 
 **PROD-3 ✅ (2026-10-19): AC-25 A/B interchangeable engines un-pended, green — `MixingEngine` frozen, module PROD done.** The single-constant `SpectralBaselineEngine` is complete and `ABHarness` ships, so the measured-pigment `CustomKmEngine` and the baseline drive through the identical `inverse(target, palette, opts)` call with no caller change (SI D3). Baseline = genuine single-constant: each paint reduced to its per-λ `K/S` ratio, those mixed linearly (vs the two-constant engine's separate `Kmix`/`Smix`), then the shared `kmReflectance → saundersonToMeasured → spectrumToColour` pipeline; its `inverse` is a self-contained subset search (per-medium partition, coarse grid + refinement, best-first/fewer-paints ranking, honest OOG flag) reusing `deltaE2000Xyz` + `recipeProvenance`. `lib/src/ab/ab_harness.dart` (`ABHarness`/`ABReport`, barrel-exported) reports each engine's per-swatch and mean ΔE00 on a shared set. Grade gate: 20 A, 0 downgrades; cov baseline 117/117 · harness 24/24; fix 0/3. 20 un-pended / 7 pending. The baseline is a *reference* model — it omits the TUNE chroma penalty and predicts wet-state only (both product levers), by design.
 
-**No ungated phase remains to start.** Every remaining phase is gate-blocked or the final sign-off:
-- **Gate-blocked:** DATA-5 (AC-7)/DATA-7 (AC-11)/TUNE-3 (AC-21) on **G-3**; DATA-6 (AC-9) on **G-4**; FORWARD-3 (AC-12) on **G-3/G-4**; STRETCH-2/3 (AC-26/27) on **G-7**. G-5 folds into G-3/G-4 acquisition; G-6 adds AC-17 held-out validation *evidence* (not solver logic).
-- **SIGNOFF-1** waits on its remaining dependencies DATA-7 (G-3) and STRETCH-3 (G-7) — both gate-blocked. PROD-3 closed the PROD-3 dependency; TUNE-4 is already done.
+**2026-10-19: G-7 resolved (Build STRETCH) → STRETCH-2/3 now startable.** G-7 is closed (owner: build glazing + metamerism). STRETCH-2 (AC-26 glazing) and STRETCH-3 (AC-27 metamerism) are the only ungated startable phases now; each runs in its own session. STRETCH-2 depends on FORWARD-4 (done); STRETCH-3 on COLOR-2/FORWARD-2 (done). `@stretch` scenarios are excluded from the default acceptance run — enabling them is part of each STRETCH phase.
+
+**2026-10-19: DATA-5 attempted, stopped before code — blocked by observer mismatch (new G-9).** The Golden/RIT acrylic data is in hand and its fields/grid are confirmed, but AC-7's ≤ 0.5 round-trip to the dataset's **D65/10°** published Lab is unachievable under the frozen **CIE 1931 2°** colour pipeline (probe: 66/78 paints > 0.5, max 6.75, chroma-correlated). **G-9 needs an owner decision** (adopt 10° / relax AC-7 / different data / accept gap) before DATA-5 can be re-planned. No DATA-5 code written.
+
+- **Startable now:** STRETCH-2, STRETCH-3 (independent of the acrylic dataset — can run in parallel).
+- **Gate-blocked:** DATA-5 (AC-7) on **G-9**; DATA-7 (AC-11) on **G-3** attribution wording; TUNE-3 (AC-21) on **G-3**/**G-9** (real-palette fidelity); DATA-6 (AC-9) on **G-4**; FORWARD-3 (AC-12) on **G-3/G-4/G-9**. G-6 adds AC-17 held-out validation *evidence* (not solver logic).
+- **SIGNOFF-1** waits on DATA-7, STRETCH-2, STRETCH-3, and the DATA-5/G-9 resolution.
 
 To advance, a human must resolve a dataset/scope gate (G-3, G-4, or G-7) — see *Open gates*. Nothing in this feature is startable without one.
 
@@ -307,7 +312,8 @@ To advance, a human must resolve a dataset/scope gate (G-3, G-4, or G-7) — see
 | TUNE-4 | b9024ea1 | 2026-10-19 05:20 EDT | 05:36 | 16m 55s | 16m 55s | claude-opus-4-8 | 140 | 242,155 | 8,572,317 | 59,382 | 8,873,994 | AC-23 wet/dry un-pended & green; post-prediction state transform; 18 A re-grade, 0 downgrades; cov 47/47+19/19+15/15; fix 0/3 |
 | PROD-2 | 6545e916 | 2026-10-19 05:41 EDT | 05:54 | 12m 45s | 12m 45s | claude-opus-4-8 | 144 | 191,626 | 6,837,961 | 38,590 | 7,068,321 | AC-24 provenance tiering un-pended & green; 19 A re-grade, 0 downgrades; cov 146/146·9/9; fix 0/3 |
 | PROD-3 | 70fd77ae | 2026-10-19 06:10 EDT | 06:29 | 18m 43s | 18m 43s | claude-opus-4-8 | 182 | 262,778 | 10,970,064 | 66,543 | 11,299,567 | AC-25 A/B engines un-pended & green; 20 A, 0 downgrades; cov 117/117·24/24; fix 0/3; MixingEngine frozen, module PROD done |
-| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-19 06:29** | **13h 58m** | **8h 19m** |  | **4,120** | **6,812,286** | **234,346,055** | **1,747,163** | **242,909,624** |  |
+| GATE-DECISION | 53e1b2dc | 2026-10-19 06:36 EDT | 07:47 | 1h 11m | 16m 24s | claude-opus-4-8 | 74 | 141,934 | 4,378,491 | 65,628 | 4,586,127 | G-7 approved (Build STRETCH → STRETCH-2/3 startable); DATA-5 attempted, no code — blocked by 2°/10° observer mismatch, new G-9 (probe 66/78 paints >0.5 vs dataset D65/10° Lab) |
+| **Feature total** |  | **2026-10-15 21:14 EDT** | **2026-10-19 07:47** | **15h 09m** | **8h 35m** |  | **4,194** | **6,954,220** | **238,724,546** | **1,812,791** | **247,495,751** |  |
 
 ## Sign-off
 

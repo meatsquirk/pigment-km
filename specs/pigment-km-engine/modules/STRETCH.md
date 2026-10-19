@@ -1,24 +1,24 @@
 # Module STRETCH — glazing + metamerism (optional S6)
 
-**Status:** Not started — deferred behind G-7
+**Status:** Not started — **G-7 resolved 2026-10-19 (Build STRETCH); STRETCH-2 and STRETCH-3 are startable** (each its own session; independent of the acrylic dataset).
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/stretch/glazing.dart` (finite-thickness layering), `lib/src/stretch/metamerism.dart` (multi-illuminant index)
-**Depends on:** FORWARD, COLOR · **Blocks:** SIGNOFF-1 (only if G-7 enables STRETCH)
+**Depends on:** FORWARD, COLOR · **Blocks:** SIGNOFF-1 (G-7 enabled STRETCH → now a real dependency)
 
 ## Dashboard
 
 | Phase | Kind | Target AC | Status | Tokens | Time |
 |---|---|---|---|---|---|
-| 2 (STRETCH-2) | behavior | AC-26 | ⬜ Todo (G-7) | | |
-| 3 (STRETCH-3) | behavior | AC-27 | ⬜ Todo (G-7) | | |
+| 2 (STRETCH-2) | behavior | AC-26 | ⬜ Todo — startable (G-7 ✅) | | |
+| 3 (STRETCH-3) | behavior | AC-27 | ⬜ Todo — startable (G-7 ✅) | | |
 
 ## Interface reconciliation
 
 Design §3.4 (finite-thickness layering — the opaque dataset doesn't give transparent-glaze params, so this uses assumed film thickness, a known caveat) and §9 (metamerism across D65 + a warm studio illuminant). `@stretch`-tagged scenarios are excluded from the default acceptance run until G-7. "Only if value is proven" (design §8).
 
 ## Open gates
-- **G-7** (decision) blocks both phases: confirm STRETCH scope before building it.
-- **G-2** blocks all behavior.
+- **G-7** (decision) ✅ Resolved 2026-10-19: **Build STRETCH** — glazing + metamerism in scope (Matt Quirk). Both phases unblocked.
+- **G-2** blocks all behavior. ✅ Resolved 2026-10-16 (acceptance tests approved).
 
 ## Phase 2 — STRETCH-2: finite-thickness glazing (AC-26)
 
