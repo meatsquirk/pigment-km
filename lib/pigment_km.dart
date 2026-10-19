@@ -25,6 +25,7 @@ export 'src/grid.dart';
 export 'src/km/mixing.dart';
 export 'src/km/reflectance.dart';
 export 'src/km/saunderson.dart';
+export 'src/stretch/glazing.dart';
 export 'src/types/colour_value.dart';
 export 'src/types/medium.dart';
 export 'src/types/mix_options.dart';

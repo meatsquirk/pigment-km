@@ -500,21 +500,86 @@ void main() {
   group('STRETCH — optional S6 (gated behind G-7)', () {
     test('AC-26 · TestAC26_Glazing: a glaze over a ground predicts via the '
         'finite-thickness layering equation', () {
-      // SCOPE GATE (G-7 open): finite-thickness glazing (design §3.4) is an
-      // optional S6 scenario. Its public layering API is intentionally NOT frozen
-      // until G-7 approves the scope and STRETCH-2 adds it (Option-A-style). This
-      // placeholder fails here on its scope precondition; STRETCH-2 replaces the
-      // body with the scenario below, driven through the frozen layering API:
-      //   GIVEN  a mixture glazed at a finite film thickness X over a ground of
-      //          known reflectance Rg (assert X finite & Rg a valid spectrum).
-      //   WHEN   its layered reflectance is computed.
-      //   THEN   it follows the §3.4 finite-thickness KM layering equation, and
-      //          as X → ∞ the result approaches the opaque-form reflectance
-      //          (CONTROL: a large X ≈ `reflectanceOf` of the opaque mix).
-      //   REJECTS reusing the opaque form (ignoring thickness/ground).
-      expect(_stretchScopeApproved, isTrue,
-          reason: 'AC-26 finite-thickness glazing is @stretch — gated behind '
-              'G-7; STRETCH-2 freezes the layering API and un-pends this');
+      // Un-pended by STRETCH-2 (G-7 ✅ Build STRETCH). Driven through the frozen
+      // layering API `glazedReflectance` (design §3.4), public surface only.
+      final paints = synthPigments();
+      // GIVEN a mixture (a tinted blue glaze) applied as a film of finite
+      // thickness X over a ground of known reflectance Rg.
+      final glaze = mixTwoConstant(<MixComponent>[
+        (k: paints[1].k, s: paints[1].s, weight: 0.7), // phthalo blue
+        (k: paints[0].k, s: paints[0].s, weight: 0.3), // opaque white
+      ]);
+      // The opaque body reflectance of the same mixture (the X → ∞ target).
+      final koverS = Float32List(CanonicalGrid.bins);
+      for (var i = 0; i < CanonicalGrid.bins; i++) {
+        koverS[i] = glaze.k[i] / glaze.s[i];
+      }
+      final opaque = kmReflectance(koverS);
+      // A known, valid ground reflectance distinct from the opaque mix, so the
+      // ground genuinely shows through a finite film.
+      final ground = Float32List.fromList(
+          List<double>.filled(CanonicalGrid.bins, 0.6));
+      const xFinite = 1.0;
+
+      // Given checks: X is a finite positive thickness; Rg is a valid spectrum
+      // with physical reflectances in (0, 1].
+      expect(xFinite.isFinite && xFinite > 0, isTrue);
+      expect(ground.length, CanonicalGrid.bins);
+      for (final v in ground) {
+        expect(v, greaterThan(0));
+        expect(v, lessThanOrEqualTo(1));
+      }
+
+      // WHEN its layered reflectance is computed.
+      final layered =
+          glazedReflectance(glaze: glaze, thickness: xFinite, ground: ground);
+
+      // THEN the result is a physical reflectance spectrum on the grid.
+      expect(layered.length, CanonicalGrid.bins);
+      for (final v in layered) {
+        expect(v, inInclusiveRange(0.0, 1.0));
+      }
+
+      // CONTROL — as X → ∞ the layered reflectance approaches the opaque form.
+      final thick =
+          glazedReflectance(glaze: glaze, thickness: 1e6, ground: ground);
+      for (var i = 0; i < CanonicalGrid.bins; i++) {
+        expect(thick[i], closeTo(opaque[i], 1e-5),
+            reason: 'a thick glaze must approach the opaque-form reflectance');
+      }
+
+      // And as X → 0 the bare ground shows through — the ground, not the mix,
+      // governs a vanishingly thin film.
+      final thin =
+          glazedReflectance(glaze: glaze, thickness: 1e-6, ground: ground);
+      for (var i = 0; i < CanonicalGrid.bins; i++) {
+        expect(thin[i], closeTo(ground[i], 1e-3),
+            reason: 'a vanishing glaze must reveal the ground');
+      }
+
+      // The finite film lies between the ground and the opaque form at every
+      // wavelength, and differs from the opaque form — REJECTS reusing the
+      // opaque body reflectance (which would ignore the thickness and ground).
+      var sawDepartureFromOpaque = false;
+      for (var i = 0; i < CanonicalGrid.bins; i++) {
+        final lo = math.min(ground[i], opaque[i]);
+        final hi = math.max(ground[i], opaque[i]);
+        expect(layered[i], inInclusiveRange(lo - 1e-6, hi + 1e-6),
+            reason: 'bin $i must lie between the ground and the opaque form');
+        if ((layered[i] - opaque[i]).abs() > 1e-3) sawDepartureFromOpaque = true;
+      }
+      expect(sawDepartureFromOpaque, isTrue,
+          reason: 'a finite glaze over a different ground must not equal the '
+              'opaque form');
+
+      // Self-consistency: a glaze over a ground of its own opaque colour is
+      // unchanged at a finite thickness — pins the layering equation itself.
+      final onOwnGround =
+          glazedReflectance(glaze: glaze, thickness: xFinite, ground: opaque);
+      for (var i = 0; i < CanonicalGrid.bins; i++) {
+        expect(onOwnGround[i], closeTo(opaque[i], 1e-5),
+            reason: 'layering over an identical-reflectance ground is a no-op');
+      }
     }, tags: 'stretch', skip: ac('AC-26'));
 
     test('AC-27 · TestAC27_Metamerism: illuminant-fragile matches are flagged '

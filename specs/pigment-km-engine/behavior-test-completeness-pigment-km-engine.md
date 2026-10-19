@@ -577,3 +577,27 @@ Result: 22 A. (Pending AC-7/9/11/12/21/26/27 authored against the 10° basis in 
 | AC-25 | TestAC25_ABEngines | A (re-confirmed) | Both engines behind one `MixingEngine` call; finite non-negative ΔE00 per swatch. |
 
 Result: 21 A, 0 B, 0 downgrades. (Still-pending AC-9/11/12/21/26/27 fail for cause in the red baseline and are graded in their own later phases — not here.)
+
+## Behaviour grade — STRETCH-2 (un-pended AC-26) · graded 2026-10-19
+
+**AC-26 = A (1 new test graded; the 21 prior un-pended ACs are byte-identical and
+not re-graded — STRETCH-2 adds a new module `lib/src/stretch/glazing.dart` that
+nothing else imports, and touches only the AC-26 test + the pending-gate mirror
+maps + the barrel export).** Fresh independent adversarial grader, G1–G6, with
+required library mutations (each restored, re-verified green).
+
+`TestAC26_Glazing` (@stretch) drives `glazedReflectance` through the public barrel.
+
+| G | Finding |
+|---|---|
+| G1 | X finite & >0 and Rg a valid grid-length (0,1] spectrum asserted through the public surface before the `glazedReflectance` When. |
+| G2 | Behaviour comes from the real `glazedReflectance`/`mixTwoConstant`/`kmReflectance` (barrel) — confirmed by mutation (lib edits move the result). |
+| G3 | Limit Thens settled with paired controls that move: thin X→ground vs thick X→opaque; `sawDepartureFromOpaque` proves the finite reading differs from the opaque form. |
+| G4 | Per-wavelength over the 31-bin grid at exact tolerances (thick≈opaque 1e-5, thin≈ground 1e-3, self-consistency 1e-5); the spec's "X→∞ ≈ opaque form" control present. |
+| G5 | Named Reject proven: mutation 1 (return the opaque form, ignoring X/ground) → FAIL; denominator sign flip → FAIL; remove the coth saturation clamp (overflow→NaN) → FAIL on the X→∞ control. |
+| G6 | AC-26 only (AC-27 is a separate test). |
+
+Mutations (each restored byte-identical; AC-26 re-green after each): (1) `out[i]=a−b`
+opaque reuse → FAIL; (2) `a − rg`→`a + rg` → FAIL; (3) drop `y ≥ cothSaturation`
+clamp → FAIL (control). No correctness bug found; implementation matches design §3.4
+and the X→∞ ⇒ R∞ = a−b = kmReflectance(K/S) reduction was verified algebraically.
