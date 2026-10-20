@@ -156,15 +156,21 @@ void main() {
     test('AC-21 · TestAC21_NoNeon: the curated default palette cannot produce '
         'neon mixes', () {
       final engine = customEngine();
-      // GIVEN the curated naturalistic default palette for a medium. Until
-      // TUNE-3 ships the real Zorn-style acrylic palette (G-3), this is the
-      // muted synthetic palette; TUNE-3 augments this test to the shipped set.
-      final palette = synthPigments();
+      // GIVEN the curated naturalistic default palette for a medium — the real
+      // Zorn-style earth-forward acrylic palette TUNE-3 ships (design §7 lever 1),
+      // drawn from the shipped Golden/RIT acrylic table, not the synthetic solver
+      // placeholder. (TUNE-3 augmented this test from that placeholder set.)
+      final palette = defaultPalette(Medium.acrylic);
       expect(palette, isNotEmpty);
-      // The naturalistic chroma ceiling for this palette. (TUNE-3 confirms/tunes
-      // the exact ceiling for the shipped curated palette; a neon primary such as
-      // pure sRGB green, OKLCh C≈0.295, lies well above it.)
-      const chromaCeiling = 0.25;
+      expect(palette.length, curatedAcrylicPaletteIds.length);
+      expect(palette.every((p) => p.medium == Medium.acrylic), isTrue,
+          reason: 'the curated acrylic default palette is single-medium');
+      // The naturalistic chroma ceiling is a fixed property of naturalistic
+      // colour, not of this palette: the curated earths stay well under it, while
+      // a vivid primary — a cadmium (C≈0.12–0.17) or a pure-neon target (C≈0.30)
+      // through this measured-data pipeline — lies above it, so a palette that
+      // admitted one would fail the loop below.
+      const chromaCeiling = naturalChromaCeiling;
 
       // WHEN any mixture of that palette is predicted …
       final paints = palette.map((p) => p.id).toList();

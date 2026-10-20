@@ -565,6 +565,17 @@ void main() {
       );
     });
 
+    test('resolves a curated-default-palette id not in the synthetic tables '
+        '(TUNE-3 fallback)', () {
+      // The curated default palette's real paints are not in the synthetic
+      // solver tables, so the resolver must fall back to defaultPaletteById.
+      // Covers the curated-found arm of _resolve; rejects a resolver that only
+      // searches the medium tables and throws on a shipped default-palette id.
+      final id = curatedAcrylicPaletteIds.first;
+      expect(defaultPaletteById(id), isNotNull);
+      expect(engine.forward({id: 1.0}), isA<ColourValue>());
+    });
+
     test('a mixture spanning two media throws ArgumentError', () {
       expect(
         () => engine.forward(const {
@@ -793,6 +804,13 @@ void main() {
         () => engine.reflectanceOf(const {whiteId: 0.5, 'oil.lead_white': 0.5}),
         throwsArgumentError,
       );
+    });
+
+    test('forward resolves a curated-default-palette id (TUNE-3 fallback), so '
+        'the baseline resolves the same pigment universe as the two-constant '
+        'engine (AC-25)', () {
+      final id = curatedAcrylicPaletteIds.first;
+      expect(engine.forward({id: 1.0}), isA<ColourValue>());
     });
   });
 }

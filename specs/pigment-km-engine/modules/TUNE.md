@@ -1,6 +1,6 @@
 # Module TUNE — natural, muted colour
 
-**Status:** In progress — TUNE-2 ✅ (AC-22 chroma penalty), TUNE-4 ✅ (AC-23 wet/dry). Only TUNE-3 (AC-21) left, gated on G-3 (real palette).
+**Status:** ✅ Done — TUNE-2 ✅ (AC-22 chroma penalty), TUNE-3 ✅ (AC-21 curated palette, A), TUNE-4 ✅ (AC-23 wet/dry). Module complete.
 **Feature:** [MASTER_PLAN_FOR_FEATURE.md](../MASTER_PLAN_FOR_FEATURE.md)
 **Owns (files/areas):** `lib/src/tune/default_palettes.dart` (curated naturalistic per-medium palettes), `lib/src/tune/chroma_penalty.dart`, `lib/src/tune/wet_dry.dart`
 **Depends on:** SOLVER, DATA · **Blocks:** SIGNOFF-1
@@ -10,7 +10,7 @@
 | Phase | Kind | Target AC | Status | Tokens | Time |
 |---|---|---|---|---|---|
 | 2 (TUNE-2) | behavior | AC-22 | ✅ Done | 14.91M | 30m 48s |
-| 3 (TUNE-3) | behavior | AC-21 | ⬜ Todo (G-3 real palette) | | |
+| 3 (TUNE-3) | behavior | AC-21 | ✅ Done | 15.58M | 22m 16s |
 | 4 (TUNE-4) | behavior | AC-23 | ✅ Done | 8.87M | 16m 55s |
 
 ## Interface reconciliation
@@ -18,7 +18,7 @@
 Design §7: curated limited real-pigment palette (lever 1, biggest), `chromaPenalty` λ_natural tie-break (lever 2, D-10), per-medium wet→dry transform (lever 3, D-12). No sRGB desaturation filter — naturalness is physics+palette.
 
 ## Open gates
-- **G-2** blocks all behavior. **G-3** gives the real acrylic curated palette (synthetic until then).
+- **G-2** ✅ (all behavior). **G-3** ✅ for TUNE-3 (data side cleared 2026-10-19 — the shipped `acrylic.json`/DATA-5 on the 10° basis is all the curated palette needs; attribution wording is DATA-7's).
 
 ## Phase 2 — TUNE-2: chroma penalty tie-break (AC-22)
 
@@ -93,8 +93,8 @@ visible match accuracy.
   recipe should not assume strict ΔE00-min ordering under the default (penalty on);
   (2) locating a twin-subset recipe must be by **paint-id set**, not fitted
   fractions (identical reflectance → arbitrary equally-good shares). TUNE-3 (AC-21)
-  is gated on G-3 (real Zorn-style acrylic palette + hardened chroma ceiling);
-  TUNE-4 (AC-23 wet/dry) is startable.
+  shipped the real Zorn-style acrylic palette + hardened chroma ceiling (done);
+  TUNE-4 (AC-23 wet/dry) done.
 
 ## Phase 3 — TUNE-3: curated default palette (AC-21) — real palette needs G-3
 
@@ -104,7 +104,63 @@ visible match accuracy.
 - **Exit criteria:** analyze clean; 100% touched; neon-impossible property holds.
 - **Acceptance gate:** un-pend AC-21; `TestAC21_NoNeon` green; **augment** from the synthetic palette to the real one when G-3 lands.
 
-### Result · Checkpoint  <!-- filled on completion -->
+### Result · Checkpoint  <!-- TUNE-3 ✅ 2026-10-19 -->
+
+**Gate G-3 (TUNE-3 data side, decision — Matt Quirk 2026-10-19):** the curated
+real acrylic palette needs only the shipped `acrylic.json` (DATA-5) on the 10°
+basis (COLOR-4), not the attribution wording (that is DATA-7's), so TUNE-3 is
+cleared to proceed.
+
+**Result (TUNE-3 · AC-21).** Design §7 lever 1 — the biggest naturalness lever
+is the palette itself, a curated limited set that physically cannot mix neon.
+- **New module `lib/src/tune/default_palettes.dart`** (barrel-exported). The
+  curated **Zorn-style earth-forward acrylic** palette ([curatedAcrylicPaletteIds],
+  7 Golden/RIT earths): `titan_buff` (the lightener — the real table has no
+  titanium white, so its warmest off-white stands in, a documented data-driven
+  substitution), `yellow_ochre`, `red_oxide`, `burnt_sienna`, `burnt_umber`,
+  `raw_umber`, `mars_black`. `defaultPalette(Medium.acrylic)` loads them once from
+  the shipped `acrylic.json` (the real DATA-5 table, **not** the synthetic solver
+  placeholder `load(Medium.acrylic)`, which the in-gamut solver ACs still own and
+  which TUNE-3 leaves untouched). `defaultPalette(Medium.oil)` throws
+  `UnsupportedError` (no curated oil default until G-4/DATA-6 — honest, no
+  placeholder-as-curated).
+- **Fixed ceiling `naturalChromaCeiling = 0.10`** (hardened down from the prior
+  provisional in-test 0.25): a fixed property of naturalistic colour, discriminating
+  — the curated palette's max mixture chroma ≈0.078 sits under it with real margin,
+  while a vivid cadmium (OKLCh C≈0.12–0.17 through this measured-data pipeline) and
+  a neon target (C≈0.30) lie above it.
+- **Engine resolve.** Both `CustomKmEngine._resolve` and
+  `SpectralBaselineEngine._resolve` gained a tail fallback to `defaultPaletteById`
+  after the shipped medium tables, so the public `forward` can predict the curated
+  real paints (which are not in the synthetic tables). No id collision (synthetic
+  ids searched first; the 7 curated ids are distinct), so every existing `forward`
+  resolves exactly as before — the fallback fires only for the new curated ids,
+  which previously threw. Identical change to both engines keeps them drop-in
+  interchangeable (AC-25).
+- **Acceptance.** AC-21 un-pended (`pending.dart` row removed; added to
+  `unpendedACs` → TUNE-3). The ITEST-4 augmentation (owned by TUNE-3) was made:
+  the test now drives the real `defaultPalette(Medium.acrylic)` + fixed
+  `naturalChromaCeiling`, checks the curated set (non-empty, length, single-medium)
+  and keeps the reachable-muted / neon-out-of-gamut control pair. Independent fresh
+  subagent re-grade: **A** — the prior "A (data-limited)" / provisional-ceiling flag
+  is closed.
+- **Gates.** `dart analyze lib test` clean (only the pre-existing
+  `chroma_penalty_test:38` info, not mine). Default suite **246 pass / 3 skip**;
+  run-pending red baseline **+33 −3** (AC-21 green; the 3 failures are AC-9/11/12
+  on their own preconditions naming DATA-6/DATA-7/FORWARD-3). Coverage **100%** on
+  all touched files (`default_palettes.dart` 14/14, `custom_km_engine.dart` 16/16,
+  `spectral_baseline_engine.dart` 118/118; `pigment_km.dart` export-only). Grade
+  grid: 24 A (Band 5 appended). Fix passes: 0/3.
+
+**Checkpoint / Handoff.** Verification (repo root, `export PATH="$HOME/development/flutter/bin:$PATH"`):
+`dart analyze lib test` · `dart test` (default, green) ·
+`PIGMENT_KM_RUN_PENDING=true dart test test/acceptance` (red baseline) ·
+`bash tool/coverage_gate.sh <BASE>`. **Frozen:** `curatedAcrylicPaletteIds`, the
+`naturalChromaCeiling = 0.10` bound, `defaultPalette`/`defaultPaletteById`, and the
+`_resolve` fallback in both engines. **Known gap:** no curated **oil** default yet
+(`defaultPalette(Medium.oil)` throws) — awaits G-4/DATA-6 and the §7 Monet-style
+MPI 8-tube set. TUNE module complete; the 3 remaining pending ACs (AC-9/11/12) are
+unrelated to TUNE.
 
 ## Phase 4 — TUNE-4: wet/dry transform (AC-23)
 

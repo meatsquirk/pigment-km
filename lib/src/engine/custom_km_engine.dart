@@ -1,6 +1,7 @@
 import '../data/pigment_table.dart';
 import '../grid.dart';
 import '../km/saunderson.dart';
+import '../tune/default_palettes.dart';
 import '../tune/wet_dry.dart';
 import '../types/colour_value.dart';
 import '../types/medium.dart';
@@ -53,8 +54,9 @@ class CustomKmEngine implements MixingEngine {
   }
 
   /// Resolves a paint [id] to its [Pigment] by searching the loaded pigment
-  /// table of each medium (design §4). Throws [ArgumentError] if no medium's
-  /// table holds the id.
+  /// table of each medium (design §4), then the curated default palette
+  /// ([defaultPaletteById], design §7 lever 1 — its real paints are not in the
+  /// synthetic solver tables). Throws [ArgumentError] if nothing holds the id.
   static Pigment _resolve(String id) {
     for (final medium in Medium.values) {
       final pigment = PigmentTable.load(medium).byId(id);
@@ -62,6 +64,14 @@ class CustomKmEngine implements MixingEngine {
         return pigment;
       }
     }
-    throw ArgumentError.value(id, 'id', 'no paint with this id in any medium table');
+    final curated = defaultPaletteById(id);
+    if (curated != null) {
+      return curated;
+    }
+    throw ArgumentError.value(
+      id,
+      'id',
+      'no paint with this id in any medium table or the curated default palette',
+    );
   }
 }
